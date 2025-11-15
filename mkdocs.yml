@@ -1,0 +1,5 @@
+site_name: DS223 - Group 7 Docs
+
+nav:
+  - Home: index.md
+  - Problem Definition: problem-definition.md
