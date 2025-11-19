@@ -1,6 +1,4 @@
-"""
-Frontend entry point (e.g., Streamlit app).
+import streamlit as st
 
-Group role: Frontend Developer (Edelveys).
-This file will later implement the dashboard UI that calls the backend services.
-"""
+st.title("Frontend Service")
+st.write("Frontend container is running successfully!")
