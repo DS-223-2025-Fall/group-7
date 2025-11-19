@@ -1,0 +1,13 @@
+services:
+  data_science:
+    build:
+      context: ./data_science
+      dockerfile: Dockerfile
+    volumes:
+      - ./data_science:/data_science
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    depends_on:
+      - db
