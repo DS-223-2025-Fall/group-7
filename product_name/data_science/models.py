@@ -25,9 +25,8 @@ class Bandit(Base):
     price = Column(Float, nullable=False)
 
     mean = Column(Float, default=0.0)
-    precision = Column(Float, default=1.0)
-    tau = Column(Float, default=1.0)        
-    sum_x = Column(Float, default=0.0)
+    variance = Column(Float, default=1.0)
+    reward = Column(Float, default=0.0)        
     trial = Column(Integer, default=0)
 
     updated_at = Column(DateTime, default=datetime.utcnow)
