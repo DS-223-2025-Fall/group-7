@@ -9,5 +9,3 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Ignore environment or secret files
-.env
