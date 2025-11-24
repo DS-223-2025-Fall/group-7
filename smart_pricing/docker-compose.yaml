@@ -1,0 +1,111 @@
+version: "3.9"
+
+services:
+  db:
+    container_name: postgresql_db
+    image: postgres:16
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    volumes:
+      - ./pgadmin_data:/var/lib/pgadmin
+    user: "0:0"
+
+  etl:
+    container_name: etl
+    build:
+      context: .                
+      dockerfile: etl/Dockerfile 
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: db
+      DB_PORT: 5432
+    volumes:
+      - ./etl:/app/etl
+      - ./core:/app/core
+
+  backend:
+    container_name: backend
+    build:
+      context: .                     
+      dockerfile: backend/Dockerfile 
+    ports:
+      - "8000:8000"
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: db
+      DB_PORT: 5432
+      DS_BASE_URL: http://ds:8888
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - ./core:/app/core
+
+  ds:
+    container_name: ds
+    build:
+      context: .         
+      dockerfile: ds/Dockerfile 
+    ports:
+      - "8888:8888"
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./ds:/app/ds
+      - ./core:/app/core
+
+  app:
+    container_name: streamlit_app
+    build:
+      context: .                   
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app/frontend
+
+volumes:
+  postgres_data:
+  pgadmin_data:

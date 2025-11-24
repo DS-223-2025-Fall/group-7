@@ -1,0 +1,9 @@
+flask
+flask-cors
+apscheduler
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pytz
+requests
+

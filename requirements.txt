@@ -1,13 +1,2 @@
-flask
-streamlit
-SQLAlchemy
-psycopg2-binary
-pytz
-requests
-apscheduler
-numpy
-pandas
-dotenv
-python-dotenv
-flask_cors
-werkzeug
+mkdocs-material
+mkdocstrings[python]
