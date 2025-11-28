@@ -1,17 +1,22 @@
-FROM python:3.11-slim
+# Dockerfile
+FROM python:3.11-slim-bullseye
 
-WORKDIR /app
+RUN apt-get update && apt-get install -y \
+    build-essential libpq-dev libfreetype6-dev libpng-dev libjpeg-dev \
+    libblas-dev liblapack-dev gfortran \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /backend
 
-# shared core
-COPY core /app/core
-# backend service
-COPY backend /app/backend
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-ENV PYTHONPATH=/app
+COPY backend/requirements.txt /backend/requirements.txt
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r /backend/requirements.txt
+
+COPY backend /backend
 
 EXPOSE 8000
 
-CMD ["python", "-m", "backend.main"]
+CMD ["uvicorn", "endpoints:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
