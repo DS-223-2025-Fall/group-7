@@ -6,5 +6,5 @@ def main():
     Base.metadata.create_all(engine)
     print("Database tables successfully created.")
 
-if name == "__main__":
+if __name__ == "__main__": 
     main()

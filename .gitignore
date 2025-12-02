@@ -10,4 +10,6 @@ __pycache__/
 *.pyo
 
 .Rhistory
+pgadmin_data
+postegres_data
 
