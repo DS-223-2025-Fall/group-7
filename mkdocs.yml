@@ -1,5 +1,42 @@
-site_name: DS223 - Group 7 Docs
+site_name: Smart Pricing Playground
 
 nav:
   - Home: index.md
-  - Problem Definition: problem-definition.md
+  - Demo: demo.md
+  - ETL: etl.md
+  - API: api.md
+  - APP: app.md
+  - API models: api_models.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  language: en
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+      primary: teal
+      accent: purple
+    - scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+      primary: teal
+      accent: lime
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["."]

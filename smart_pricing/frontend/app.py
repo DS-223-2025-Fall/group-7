@@ -3,6 +3,10 @@ import requests
 from decimal import Decimal
 import pandas as pd
 import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from scipy.stats import norm
+
 
 API_BASE_URL = "http://backend:8000"  # docker-compose backend name
 
@@ -216,6 +220,47 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+def build_posterior_plot(bandits):
+    """
+    Build interactive Plotly posterior distribution plot
+    using bandit mean and precision (variance=lambda).
+    """
+    fig = go.Figure()
+
+    means = [float(b["mean"]) for b in bandits]
+    stds = [1 / np.sqrt(float(b["variance"])) if float(b["variance"]) > 0 else 1.0 for b in bandits]
+
+    xmin = min(means) - 4 * max(stds)
+    xmax = max(means) + 4 * max(stds)
+    x = np.linspace(xmin, xmax, 400)
+
+    for b in bandits:
+        mean = float(b["mean"])
+        lam = float(b["variance"])
+        std = 1 / np.sqrt(lam) if lam > 0 else 1.0
+
+        y = norm.pdf(x, mean, std)
+
+        fig.add_trace(
+            go.Scatter(
+                x=x,
+                y=y,
+                mode="lines",
+                line=dict(width=3),
+                name=f"Price={float(b['price']):.2f} | Mean={mean:.2f} | Trials={b['trial']}"
+            )
+        )
+
+    fig.update_layout(
+        title="Posterior Distributions of Bandits",
+        xaxis_title="Reward",
+        yaxis_title="Density",
+        height=420,
+        template="plotly_dark",
+        legend=dict(orientation="h", y=1.15)
+    )
+
+    return fig
 
 # ----------------------- SESSION STATE ----------------------------
 if "page" not in st.session_state:
@@ -471,22 +516,36 @@ def dashboard_page():
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Simple synthetic chart (as in your original)
+    # -------- Plotly line chart instead of st.line_chart --------
     with top[1]:
         dates = pd.date_range("2024-08-01", periods=10, freq="7D")
         line_one = (
             np.linspace(0.8, 2.0, len(dates))
             + np.random.uniform(-0.2, 0.2, len(dates))
         )
-        df_chart = pd.DataFrame({"date": dates, "Revenue Index": line_one}).set_index(
-            "date"
+        df_chart = pd.DataFrame(
+            {"date": dates, "Revenue Index": line_one}
         )
+
         st.markdown(
             "<div style='font-size:13px;color:#e5e7eb;margin-bottom:4px;'>Revenue Trend (Synthetic)</div>",
             unsafe_allow_html=True,
         )
-        st.line_chart(df_chart, height=260)
 
+        fig = px.line(
+            df_chart,
+            x="date",
+            y="Revenue Index",
+            markers=True,
+        )
+        fig.update_layout(
+            margin=dict(l=10, r=10, t=10, b=10),
+            xaxis_title="Date",
+            yaxis_title="Revenue Index",
+            template="plotly_dark",
+            height=260,
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 # --------------------- PRODUCT DETAILS PAGE ------------------------
 def product_details_page():
