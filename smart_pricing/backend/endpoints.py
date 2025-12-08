@@ -238,11 +238,11 @@ def submit_reward(
     req: SubmitRewardRequest,
     db: Session = Depends(get_db),
 ):
-
     bandit = db.query(Bandit).filter_by(bandit_id=bandit_id).first()
     if not bandit:
         raise HTTPException(404, "Bandit not found")
 
+    # Write experiment record
     experiment = Experiment(
         project_id=bandit.project_id,
         bandit_id=bandit_id,
@@ -251,10 +251,11 @@ def submit_reward(
     )
     db.add(experiment)
 
-    bandit.reward += req.reward
+    # FIXED FLOAT HANDLING
+    bandit.reward = float(bandit.reward) + float(req.reward)
     bandit.trial += 1
-    bandit.mean = bandit.reward / bandit.trial
-    bandit.variance = max(1.0 / bandit.trial, 0.0001)
+    bandit.mean = float(bandit.reward) / float(bandit.trial)
+    bandit.variance = max(1.0 / float(bandit.trial), 0.0001)
 
     db.commit()
 

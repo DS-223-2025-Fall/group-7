@@ -4,9 +4,14 @@ import requests
 import pandas as pd
 import numpy as np
 from typing import Optional
+import os
+import altair as alt
+from scipy.stats import norm
+
+
 
 # ==== CONFIG ====
-API_BASE_URL = "http://backend:8000"
+API_BASE_URL = os.getenv("BACKEND_URL", "http://backend:8000")
 
 # Convert backend static path → public URL
 def make_public_image_url(path: str | None):
@@ -456,7 +461,15 @@ def submit_reward(bandit_id: int, reward: float, decision: str):
         f"{API_BASE_URL}/bandits/{bandit_id}/thompson/reward",
         json={"reward": float(reward), "decision": decision},
     )
-    return r.json() if r and r.status_code == 200 else None
+    if not r:
+        st.error("Reward request failed (network).")
+        return None
+    if r.status_code != 200:
+        st.error(f"Reward request failed: {r.status_code} {r.text}")
+        return None
+    res = r.json()
+    st.write("Debug reward response:", res)  # TEMP: to see it in the UI
+    return res
 
 
 def fetch_posterior_plot(project_id: int):
@@ -575,7 +588,7 @@ def add_product_page():
     if prices_str:
         try:
             prices = [float(x.strip()) for x in prices_str.split(",") if x.strip()]
-        except:
+        except Exception:
             st.error("Invalid price list.")
             return
     else:
@@ -646,7 +659,6 @@ def experiment_page():
 
     bandits = fetch_bandits(pid)
 
-    summary_cols = st.columns([1.4, 1.4, 1.2])
     if bandits:
         df = pd.DataFrame(
             [
@@ -662,55 +674,112 @@ def experiment_page():
             ]
         )
 
-        # Summary metrics (purely visual, no logic change)
-        with summary_cols[0]:
-            best_idx = df["mean"].idxmax()
-            best_price = df.loc[best_idx, "price"]
-            best_mean = df.loc[best_idx, "mean"]
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <div class="metric-label">Current best price</div>
-                    <div class="metric-value">${best_price:.2f}</div>
-                    <div class="metric-tag">
-                        <span class="metric-tag-dot"></span>
-                        <span>Expected reward {best_mean:.3f}</span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        with summary_cols[1]:
-            total_trials = int(df["trials"].sum())
-            st.markdown(
-                f"""
-                <div class="metric-card" style="background:linear-gradient(135deg,#0f172a,#1f2937);border-color:rgba(148,163,184,0.45);box-shadow:0 14px 32px rgba(15,23,42,0.9);">
-                    <div class="metric-label">Total trials</div>
-                    <div class="metric-value">{total_trials}</div>
-                    <div class="metric-tag">
-                        <span class="metric-tag-dot" style="background:#38bdf8;"></span>
-                        <span>Across all bandits</span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        with summary_cols[2]:
-            st.markdown(
-                """
-                <div class="surface-soft" style="font-size:0.75rem;color:#9ca3af;">
-                    The best price is computed from the current posterior means of each bandit.
-                    Use manual decisions below to simulate customer behavior and refine these estimates.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
+        # Bandit table
         st.markdown('<div class="section-title">Bandit state</div>', unsafe_allow_html=True)
         st.dataframe(df, use_container_width=True)
+            
 
+        # ===== SUMMARY KPIs =====
+        total_trials = int(df["trials"].sum())
+        total_reward = float(df["reward_sum"].sum())
+        conversion_rate = total_reward / total_trials if total_trials > 0 else 0
+
+        best_idx = df["mean"].idxmax()
+        best_price = df.loc[best_idx, "price"]
+        best_mean = df.loc[best_idx, "mean"]
+
+        kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+
+        with kpi_col1:
+            st.metric("Total Trials", total_trials)
+
+        with kpi_col2:
+            st.metric("Total Reward", f"{total_reward:.0f}")
+
+        with kpi_col3:
+            st.metric("Conversion Rate", f"{conversion_rate:.2%}")
+
+        with kpi_col4:
+            st.metric("Best Price (by expected reward)", f"${best_price:.2f}", f"{best_mean:.3f}")
+
+        # ===== BANDIT COMPARISON CHART =====
+        st.subheader("Bandit Performance Comparison")
+
+        comparison_df = df[["price", "mean", "trials"]]
+        st.bar_chart(
+            comparison_df.set_index("price")[["mean"]],
+            use_container_width=True,
+        )
+
+        # ===== TIME-SERIES PERFORMANCE CHART =====
+        st.subheader("Performance Over Time (Cumulative Trials)")
+
+        # Create a simple timeline (index = trial number)
+        if total_trials > 0:
+            timeline_df = pd.DataFrame(
+                {
+                    "trial": np.arange(1, total_trials + 1),
+                    "conversion": [1] * int(total_reward) + [0] * (total_trials - int(total_reward)),
+                }
+            )
+            # Rolling conversion rate for smoothness
+            timeline_df["rolling_rate"] = timeline_df["conversion"].rolling(20, min_periods=1).mean()
+
+            st.line_chart(
+                timeline_df.set_index("trial")[["rolling_rate"]],
+                use_container_width=True,
+            )
+    else:
+        st.info("No bandits found for this project.")
+    # ==== POSTERIOR DISTRIBUTIONS (NATIVE STREAMLIT PLOT) ====
+    st.subheader("Posterior Distributions (Thompson Sampling)")
+
+    if not df.empty:
+        bandit_curves = []
+
+        # Build Gaussian posterior curves for each bandit
+        for _, row in df.iterrows():
+            mean = float(row["mean"])
+            var = float(row["variance"])
+            std = max(var, 1e-6) ** 0.5
+            price = float(row["price"])
+            bandit_id = int(row["bandit_id"])
+
+            xs = np.linspace(mean - 4 * std, mean + 4 * std, 200)
+
+            for x in xs:
+                bandit_curves.append({
+                    "x": x,
+                    "density": norm.pdf(x, mean, std),
+                    "bandit": f"Bandit {bandit_id} | price={price}"
+                })
+
+        chart_df = pd.DataFrame(bandit_curves)
+
+        posterior_chart = (
+            alt.Chart(chart_df)
+            .mark_line()
+            .encode(
+                x=alt.X("x:Q", title="Expected Reward"),
+                y=alt.Y("density:Q", title="Density"),
+                color=alt.Color("bandit:N", title="Bandit"),
+                tooltip=["bandit", "x", "density"]
+            )
+            .properties(
+                height=350,
+                width="container"
+            )
+            .interactive()
+        )
+
+        st.altair_chart(posterior_chart, use_container_width=True)
+
+    else:
+        st.info("No bandits available for posterior plot.")
+
+
+
+    # ===== CONTROL SECTION =====
     st.markdown('<div class="section-title">Control</div>', unsafe_allow_html=True)
     control_col_left, control_col_right = st.columns([1.5, 1])
 
@@ -733,27 +802,8 @@ def experiment_page():
                 st.session_state.customer_refresh = True
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with control_col_right:
-        st.markdown('<div class="surface-soft">', unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div style="font-size:0.78rem;color:#9ca3af;margin-bottom:0.45rem;">
-                Inspect the current posterior distributions over conversion for all bandits.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if st.button("Show posterior plot"):
-            img = fetch_posterior_plot(pid)
-            if img:
-                st.image(img, use_column_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
-    bid = st.session_state.current_bandit_id
-    if not bid:
-        st.info("No bandit selected yet. Sample using Thompson to choose a price.")
-        return
-
+    # ===== MANUAL OUTCOMES =====
     st.markdown('<div class="section-title">Manual outcomes</div>', unsafe_allow_html=True)
     colA, colB = st.columns(2)
 
@@ -764,7 +814,7 @@ def experiment_page():
             unsafe_allow_html=True,
         )
         if st.button("Record buy (admin)", type="primary"):
-            submit_reward(bid, 1.0, "buy_admin")
+            submit_reward(pid, 1.0, "buy_admin")
             st.session_state.customer_refresh = True
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
@@ -776,10 +826,28 @@ def experiment_page():
             unsafe_allow_html=True,
         )
         if st.button("Record no-buy (admin)"):
-            submit_reward(bid, 0.0, "no_buy_admin")
+            submit_reward(pid, 0.0, "no_buy_admin")
             st.session_state.customer_refresh = True
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
+
+    # ===== EXPLANATORY TEXT =====
+    st.markdown(
+        """
+        ### How to Interpret These Analytics
+
+        **Summary KPIs** give a quick overview of experiment health:
+        - *Total Trials* shows sample size.
+        - *Conversion Rate* helps measure customer interest.
+        - *Best Price* reflects the bandit with the highest expected reward.
+
+        **Bandit Performance Comparison** visualizes which price performs best at the moment.
+
+        **Performance Over Time** shows whether learning is stabilizing or drifting.
+
+        Together, these analytics support clearer and faster decisions about pricing experiments.
+        """
+    )
 
 
 # ======================================================
