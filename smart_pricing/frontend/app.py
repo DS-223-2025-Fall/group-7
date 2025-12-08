@@ -1,781 +1,937 @@
+# frontend/app.py
 import streamlit as st
 import requests
-from decimal import Decimal
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from scipy.stats import norm
+from typing import Optional
 
+# ==== CONFIG ====
+API_BASE_URL = "http://backend:8000"
 
-API_BASE_URL = "http://backend:8000"  # docker-compose backend name
+# Convert backend static path → public URL
+def make_public_image_url(path: str | None):
+    if not path:
+        return None
+    # Streamlit UI loads from browser → needs localhost, not backend
+    return f"http://localhost:8000{path}"
 
-# ----------------------- STREAMLIT CONFIG --------------------------
+# ==== PAGE CONFIG ====
 st.set_page_config(
     page_title="Smart Pricing System",
     layout="wide",
-    page_icon="💸",
+    initial_sidebar_state="expanded",
 )
 
+# ==== STYLES ====
 st.markdown(
     """
     <style>
-    /* ---------- GLOBAL LAYOUT ---------- */
-    [data-testid="stAppViewContainer"] {
-        background: radial-gradient(circle at top, #4f46e5 0, #111827 55%, #020617 100%);
-        color: #e5e7eb;
+    :root {
+        --bg-main: #020617;
+        --bg-elevated: #020617;
+        --bg-card: rgba(15,23,42,0.9);
+        --bg-soft: rgba(15,23,42,0.6);
+        --border-subtle: rgba(148,163,184,0.25);
+        --border-strong: rgba(148,163,184,0.4);
+        --accent: #4f46e5;
+        --accent-soft: rgba(79,70,229,0.12);
+        --accent-strong: #6366f1;
+        --accent-muted: #818cf8;
+        --success: #22c55e;
+        --danger: #ef4444;
+        --text-main: #e5e7eb;
+        --text-soft: #9ca3af;
+        --text-mute: #6b7280;
+        --radius-lg: 18px;
+        --radius-md: 12px;
+        --radius-pill: 999px;
+        --shadow-soft: 0 18px 45px rgba(15,23,42,0.75);
+        --shadow-subtle: 0 10px 30px rgba(15,23,42,0.6);
+        --shadow-pill: 0 12px 25px rgba(37,99,235,0.45);
     }
-    [data-testid="stSidebar"] {
-        background: linear-gradient(to bottom, #020617, #020617);
-        border-right: 1px solid rgba(148, 163, 184, 0.2);
-    }
-    #MainMenu, header, footer { visibility: hidden; }
 
-    /* ---------- TYPOGRAPHY ---------- */
-    .title-text {
-        text-align: center;
-        color: #f9fafb;
-        font-size: 38px;
-        font-weight: 800;
-        letter-spacing: 0.14em;
-        margin-top: 30px;
+    /* App background */
+    [data-testid="stAppViewContainer"] {
+        background:
+            radial-gradient(circle at top, rgba(79,70,229,0.35) 0, transparent 50%),
+            radial-gradient(circle at bottom left, rgba(59,130,246,0.18) 0, transparent 45%),
+            var(--bg-main);
+        color: var(--text-main);
+    }
+
+    /* Main container */
+    .main .block-container {
+        padding-top: 1.8rem;
+        padding-bottom: 3rem;
+        max-width: 1180px;
+    }
+
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #020617, #020617);
+        border-right: 1px solid rgba(15,23,42,0.9);
+        box-shadow: 18px 0 45px rgba(15,23,42,0.85);
+    }
+
+    [data-testid="stSidebar"] > div {
+        padding-top: 1rem;
+    }
+
+    .sidebar-header {
+        font-size: 1.1rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
+        color: var(--text-soft);
+        margin-bottom: 0.2rem;
     }
-    .subtitle-text {
-        text-align: center;
-        color: #c7d2fe;
-        font-size: 14px;
-        margin-top: 6px;
-        margin-bottom: 24px;
-    }
-    .section-title {
-        color: #f9fafb;
-        font-size: 24px;
+
+    .sidebar-brand {
+        font-size: 1.55rem;
         font-weight: 700;
-        margin-bottom: 4px;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-    }
-    .section-subtitle {
-        color: #9ca3af;
-        font-size: 13px;
-        margin-bottom: 16px;
+        color: var(--text-main);
+        margin-bottom: 0.1rem;
     }
 
-    /* ---------- CARDS ---------- */
-    .card {
-        background: linear-gradient(
-            135deg,
-            rgba(15, 23, 42, 0.95),
-            rgba(30, 64, 175, 0.90)
-        );
-        border-radius: 18px;
-        padding: 26px 24px;
-        border: 1px solid rgba(148, 163, 184, 0.45);
-        box-shadow:
-            0 22px 45px rgba(15, 23, 42, 0.7),
-            0 0 0 1px rgba(15, 23, 42, 0.4);
-        backdrop-filter: blur(16px);
-    }
-    .card-plain {
-        background: rgba(15, 23, 42, 0.85);
-        border-radius: 16px;
-        padding: 22px 20px;
-        border: 1px solid rgba(55, 65, 81, 0.9);
-        box-shadow:
-            0 14px 30px rgba(0, 0, 0, 0.55),
-            0 0 0 1px rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(16px);
+    .sidebar-sub {
+        font-size: 0.78rem;
+        color: var(--text-mute);
+        margin-bottom: 1.3rem;
     }
 
-    /* ---------- NAV BAR ---------- */
-    .nav-title {
-        color: #f9fafb;
-        font-size: 22px;
-        font-weight: 700;
-        letter-spacing: 0.16em;
+    .sidebar-section-label {
+        font-size: 0.72rem;
         text-transform: uppercase;
-    }
-    .nav-sub {
-        color: #9ca3af;
-        font-size: 12px;
-        margin-top: 6px;
-    }
-    .nav-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 9px;
-        border-radius: 999px;
-        background: rgba(55, 65, 81, 0.85);
-        color: #e5e7eb;
-        font-size: 11px;
-        margin-left: 8px;
+        letter-spacing: 0.18em;
+        color: var(--text-mute);
+        margin: 0.6rem 0 0.2rem 0.1rem;
     }
 
-    /* make the nav buttons look like pills */
+    /* Global buttons */
     .stButton > button {
-        border-radius: 999px !important;
-        border: 1px solid rgba(148, 163, 184, 0.5);
-        background: linear-gradient(135deg, #1d4ed8, #3b82f6);
-        color: #f9fafb;
-        font-weight: 600;
-        font-size: 13px;
-        padding: 0.4rem 0.8rem;
-        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.55);
-        transition: all 0.18s ease-out;
+        width: 100%;
+        border-radius: var(--radius-pill);
+        border: 1px solid rgba(148,163,184,0.2);
+        padding: 0.55rem 0.9rem;
+        font-size: 0.84rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.98));
+        color: var(--text-main);
+        transition: all 160ms ease-out;
+        box-shadow: 0 0 0 rgba(37,99,235,0);
     }
+
     .stButton > button:hover {
-        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.8);
+        border-color: var(--accent-muted);
+        background: radial-gradient(circle at top left, rgba(79,70,229,0.16), rgba(15,23,42,0.98));
+        box-shadow: 0 10px 27px rgba(15,23,42,0.9);
         transform: translateY(-1px);
-        border-color: rgba(191, 219, 254, 0.8);
     }
 
-    /* ---------- AUTH CARDS ---------- */
-    .auth-card {
-        max-width: 420px;
-        margin: 0 auto;
+    .stButton > button:focus {
+        outline: none;
+        box-shadow: 0 0 0 1px var(--accent-muted);
     }
-    .auth-title {
-        text-align: center;
+
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        border-color: transparent;
         color: #f9fafb;
-        font-size: 20px;
-        font-weight: 600;
-        margin-bottom: 18px;
+        box-shadow: var(--shadow-pill);
     }
 
-    /* ---------- INPUTS ---------- */
-    .stTextInput > div > div > input {
-        background: rgba(15, 23, 42, 0.75);
-        color: #e5e7eb;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.5);
-        padding-left: 16px;
-        padding-right: 16px;
-        height: 40px;
-        font-size: 13px;
-    }
-    .stTextInput > div > div > input:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.6);
+    .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, var(--accent-strong), #7c3aed);
+        box-shadow: 0 12px 30px rgba(79,70,229,0.55);
     }
 
-    /* ---------- METRICS ---------- */
-    .metric-card {
-        background: linear-gradient(135deg, #1d4ed8, #2563eb);
-        padding: 14px 16px;
-        border-radius: 14px;
-        color: #f9fafb;
-        text-align: left;
-        border: 1px solid rgba(191, 219, 254, 0.7);
-        box-shadow:
-            0 14px 30px rgba(15, 23, 42, 0.7),
-            0 0 0 1px rgba(30, 64, 175, 0.7);
+    /* Inputs */
+    .stTextInput > div > div > input,
+    .stNumberInput input {
+        background-color: rgba(15,23,42,0.9);
+        border-radius: 10px;
+        border: 1px solid rgba(148,163,184,0.35);
+        color: var(--text-main);
+        font-size: 0.88rem;
     }
-    .metric-label {
-        font-size: 11px;
+
+    .stTextInput > label,
+    .stNumberInput > label,
+    .stFileUploader > label {
+        font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: #e0f2fe;
-    }
-    .metric-value {
-        font-size: 22px;
-        font-weight: 700;
-        margin-top: 4px;
-    }
-    .metric-sub {
-        font-size: 11px;
-        color: #bfdbfe;
-        margin-top: 4px;
+        color: var(--text-soft);
     }
 
-    /* ---------- SMALL UTILITIES ---------- */
-    .right-button {
+    .stFileUploader > div {
+        background-color: rgba(15,23,42,0.9);
+        border-radius: 12px;
+        border: 1px dashed rgba(148,163,184,0.45);
+    }
+
+    /* Dataframe */
+    [data-testid="stDataFrame"] {
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-subtle);
+    }
+
+    /* Headings */
+    .page-header {
         display: flex;
-        justify-content: flex-end;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 1.2rem;
+        gap: 1.1rem;
     }
-    .chip {
-        display: inline-flex;
-        padding: 4px 10px;
+
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 650;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        margin-bottom: 0.2rem;
+    }
+
+    .page-subtitle {
+        font-size: 0.9rem;
+        color: var(--text-soft);
+    }
+
+    .page-pill {
+        font-size: 0.72rem;
         border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.6);
-        font-size: 11px;
-        color: #e5e7eb;
-        gap: 6px;
+        padding: 0.2rem 0.7rem;
+        background: rgba(15,23,42,0.8);
+        border: 1px solid rgba(148,163,184,0.28);
+        color: var(--text-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        display: inline-flex;
         align-items: center;
+        gap: 0.35rem;
     }
-    .chip-dot {
+
+    .page-pill-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent-muted);
+        box-shadow: 0 0 0 3px rgba(129,140,248,0.28);
+    }
+
+    .section-title {
+        margin-top: 0.2rem;
+        margin-bottom: 0.6rem;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: var(--text-mute);
+    }
+
+    /* Cards */
+    .surface-card {
+        background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(15,23,42,0.9));
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-subtle);
+        box-shadow: var(--shadow-soft);
+        padding: 1.1rem 1.15rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .surface-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top right, rgba(79,70,229,0.18), transparent 60%);
+        opacity: 0.9;
+        pointer-events: none;
+    }
+
+    .surface-card-inner {
+        position: relative;
+        z-index: 1;
+    }
+
+    .surface-soft {
+        background: rgba(15,23,42,0.8);
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(148,163,184,0.28);
+        padding: 0.9rem 1rem;
+    }
+
+    /* Metric chips */
+    .metric-card {
+        background: linear-gradient(135deg, rgba(37,99,235,0.95), rgba(79,70,229,1));
+        padding: 10px 12px;
+        border-radius: 14px;
+        color: #f9fafb;
+        box-shadow: 0 14px 32px rgba(37,99,235,0.52);
+        border: 1px solid rgba(191,219,254,0.35);
+    }
+    .metric-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        color: #e0f2fe;
+        letter-spacing: 0.16em;
+        margin-bottom: 4px;
+    }
+    .metric-value {
+        font-size: 1.1rem;
+        font-weight: 650;
+    }
+
+    .metric-tag {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.55rem;
+        border-radius: var(--radius-pill);
+        background: rgba(15,23,42,0.8);
+        border: 1px solid rgba(148,163,184,0.28);
+        color: var(--text-soft);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-top: 0.35rem;
+    }
+
+    .metric-tag-dot {
         width: 7px;
         height: 7px;
-        border-radius: 50%;
-        background: #22c55e;
-        box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+        border-radius: 999px;
+        background: rgba(34,197,94,0.9);
     }
+
+    /* Product card */
+    .product-card {
+        background: rgba(15,23,42,0.95);
+        border-radius: 16px;
+        border: 1px solid rgba(148,163,184,0.27);
+        padding: 0.9rem 1rem;
+        margin-bottom: 0.85rem;
+        box-shadow: 0 14px 32px rgba(15,23,42,0.85);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .product-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top left, rgba(79,70,229,0.25), transparent 60%);
+        opacity: 0.85;
+        pointer-events: none;
+    }
+
+    .product-card-inner {
+        position: relative;
+        z-index: 1;
+    }
+
+    .product-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 0.15rem;
+    }
+
+    .product-sub {
+        font-size: 0.8rem;
+        color: var(--text-soft);
+    }
+
+    .product-image-placeholder {
+        width: 150px;
+        height: 150px;
+        border-radius: 16px;
+        border: 1px dashed rgba(148,163,184,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.78rem;
+        color: var(--text-soft);
+        background: rgba(15,23,42,0.8);
+    }
+
+    .product-meta-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--text-mute);
+        margin-bottom: 0.1rem;
+    }
+
+    .product-meta-value {
+        font-size: 0.84rem;
+        color: var(--text-soft);
+    }
+
+    /* Divider */
     .divider-soft {
-        border: none;
-        border-top: 1px solid rgba(148, 163, 184, 0.35);
-        margin: 10px 0 16px 0;
+        border-top: 1px solid rgba(148,163,184,0.2);
+        margin: 0.8rem 0 1.2rem 0;
+    }
+
+    /* Alert tweaks */
+    .stAlert {
+        border-radius: 12px;
+        background: rgba(15,23,42,0.9);
+        border: 1px solid rgba(148,163,184,0.4);
+    }
+
+    /* Code in sidebar */
+    .sidebar-api {
+        font-size: 0.72rem !important;
+        border-radius: 10px !important;
+        background: rgba(15,23,42,0.95) !important;
+        border: 1px solid rgba(148,163,184,0.35) !important;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
-def build_posterior_plot(bandits):
-    """
-    Build interactive Plotly posterior distribution plot
-    using bandit mean and precision (variance=lambda).
-    """
-    fig = go.Figure()
 
-    means = [float(b["mean"]) for b in bandits]
-    stds = [1 / np.sqrt(float(b["variance"])) if float(b["variance"]) > 0 else 1.0 for b in bandits]
-
-    xmin = min(means) - 4 * max(stds)
-    xmax = max(means) + 4 * max(stds)
-    x = np.linspace(xmin, xmax, 400)
-
-    for b in bandits:
-        mean = float(b["mean"])
-        lam = float(b["variance"])
-        std = 1 / np.sqrt(lam) if lam > 0 else 1.0
-
-        y = norm.pdf(x, mean, std)
-
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=y,
-                mode="lines",
-                line=dict(width=3),
-                name=f"Price={float(b['price']):.2f} | Mean={mean:.2f} | Trials={b['trial']}"
-            )
-        )
-
-    fig.update_layout(
-        title="Posterior Distributions of Bandits",
-        xaxis_title="Reward",
-        yaxis_title="Density",
-        height=420,
-        template="plotly_dark",
-        legend=dict(orientation="h", y=1.15)
-    )
-
-    return fig
-
-# ----------------------- SESSION STATE ----------------------------
+# ==== SESSION STATE ====
 if "page" not in st.session_state:
-    st.session_state.page = "auth"
-if "is_authenticated" not in st.session_state:
-    st.session_state.is_authenticated = False
-if "user_email" not in st.session_state:
-    st.session_state.user_email = ""
-if "show_register" not in st.session_state:
-    st.session_state.show_register = False
+    st.session_state.page = "customer"
+
+if "current_project_id" not in st.session_state:
+    st.session_state.current_project_id = None
+
+if "current_bandit_id" not in st.session_state:
+    st.session_state.current_bandit_id = None
+
+if "last_price" not in st.session_state:
+    st.session_state.last_price = None
+
+if "customer_offers" not in st.session_state:
+    st.session_state.customer_offers = {}
+
+if "customer_refresh" not in st.session_state:
+    st.session_state.customer_refresh = True
 
 
-def go_to(page_name):
-    st.session_state.page = page_name
-
-
-def to_float(v):
+# ==== API SAFE REQUEST WRAPPER ====
+def _safe_request(method: str, url: str, **kwargs) -> Optional[requests.Response]:
     try:
-        return float(v)
-    except Exception:
-        return v
+        return requests.request(method, url, timeout=5, **kwargs)
+    except requests.RequestException as e:
+        st.error(f"Network error calling {url}: {e}")
+        return None
 
 
-# Force auth if not logged in
-if not st.session_state.is_authenticated and st.session_state.page != "auth":
-    st.session_state.page = "auth"
-
-
-# ------------------------- API HELPERS -----------------------------
+# ==== API HELPERS ====
 def fetch_projects():
-    try:
-        r = requests.get(f"{API_BASE_URL}/projects")
-        return r.json() if r.status_code == 200 else []
-    except Exception:
-        return []
+    r = _safe_request("GET", f"{API_BASE_URL}/projects")
+    return r.json() if r and r.status_code == 200 else []
 
 
-def fetch_bandits_for_project(project_id: int):
-    try:
-        r = requests.get(f"{API_BASE_URL}/projects/{project_id}/bandits")
-        return r.json() if r.status_code == 200 else []
-    except Exception:
-        return []
+def create_project(description: str, number_bandits: int, price: float):
+    payload = {"description": description, "number_bandits": number_bandits, "price": price}
+    r = _safe_request("POST", f"{API_BASE_URL}/projects", json=payload)
+    return r.json() if r and r.status_code in (200, 201) else None
 
 
-def run_algorithm_for_project(project_id: int):
-    try:
-        r = requests.post(f"{API_BASE_URL}/projects/{project_id}/thompson/select")
-        return r.json() if r.status_code == 200 else None
-    except Exception:
-        return None
+def create_bandit(project_id: int, price: float):
+    r = _safe_request("POST", f"{API_BASE_URL}/projects/{project_id}/bandits", json={"price": price})
+    return r.json() if r and r.status_code in (200, 201) else None
 
 
-def submit_reward(bandit_id: int, reward: float, decision=None):
-    payload = {"reward": reward, "decision": decision}
-    try:
-        r = requests.post(
-            f"{API_BASE_URL}/bandits/{bandit_id}/thompson/reward", json=payload
-        )
-        return r.json() if r.status_code == 200 else None
-    except Exception:
-        return None
+def fetch_bandits(project_id: int):
+    r = _safe_request("GET", f"{API_BASE_URL}/projects/{project_id}/bandits")
+    return r.json() if r and r.status_code == 200 else []
 
 
-# -------------------------- HEADER NAV -----------------------------
-def render_header():
-    if not st.session_state.is_authenticated:
-        return
-
-    cols = st.columns([3, 1.1, 1.2, 1.6, 1])
-    with cols[0]:
-        st.markdown(
-            """
-            <div class="nav-title">
-                SMART PRICING
-                <span class="nav-badge">
-                    <span class="chip-dot"></span>
-                    Live Dashboard
-                </span>
-            </div>
-            <div class="nav-sub">
-                Signed in as <strong>{email}</strong>
-            </div>
-            """.format(email=st.session_state.user_email),
-            unsafe_allow_html=True,
-        )
-    with cols[1]:
-        if st.button("Overview", use_container_width=True):
-            go_to("dashboard")
-    with cols[2]:
-        if st.button("Product Status", use_container_width=True):
-            go_to("product_details")
-    with cols[3]:
-        if st.button("Add New Product", use_container_width=True):
-            go_to("add_product")
-    with cols[4]:
-        if st.button("Logout", use_container_width=True):
-            st.session_state.is_authenticated = False
-            st.session_state.user_email = ""
-            go_to("auth")
-
-    st.markdown("<hr class='divider-soft'/>", unsafe_allow_html=True)
+def thompson_select(project_id: int):
+    r = _safe_request("POST", f"{API_BASE_URL}/projects/{project_id}/thompson/select")
+    return r.json() if r and r.status_code == 200 else None
 
 
-# -------------------------- AUTH PAGE ------------------------------
-def auth_page():
-    st.markdown(
-        "<div class='title-text'>ADAPTIVE PRICING SYSTEM</div>",
-        unsafe_allow_html=True,
+def submit_reward(bandit_id: int, reward: float, decision: str):
+    r = _safe_request(
+        "POST",
+        f"{API_BASE_URL}/bandits/{bandit_id}/thompson/reward",
+        json={"reward": float(reward), "decision": decision},
     )
+    return r.json() if r and r.status_code == 200 else None
+
+
+def fetch_posterior_plot(project_id: int):
+    r = _safe_request("GET", f"{API_BASE_URL}/projects/{project_id}/thompson/plot")
+    return r.content if r and r.status_code == 200 else None
+
+
+# ==== SIDEBAR NAVIGATION ====
+with st.sidebar:
     st.markdown(
-        "<div class='subtitle-text'>Experiment with prices, learn from demand, and converge to optimal pricing in real-time.</div>",
+        """
+        <div class="sidebar-brand">Smart Pricing</div>
+        <div class="sidebar-sub">Adaptive experiments for retail pricing.</div>
+        """,
         unsafe_allow_html=True,
     )
 
-    # Center card
-    _, center, _ = st.columns([1, 1, 1])
-    with center:
-        st.markdown("<div class='card auth-card'>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='auth-title'>Dashboard Login</div>",
-            unsafe_allow_html=True,
-        )
+    st.markdown('<div class="sidebar-section-label">Workspace</div>', unsafe_allow_html=True)
+    if st.button("Customer View"):
+        st.session_state.page = "customer"
 
-        email = st.text_input(
-            "",
-            placeholder="EMAIL",
-            label_visibility="collapsed",
-            key="login_email",
-        )
-        password = st.text_input(
-            "",
-            placeholder="PASSWORD",
-            type="password",
-            label_visibility="collapsed",
-            key="login_password",
-        )
-        login_clicked = st.button("LOGIN", use_container_width=True)
+    if st.button("New Product (Admin)"):
+        st.session_state.page = "add"
 
-        if login_clicked:
-            if email and password:
-                try:
-                    r = requests.post(
-                        f"{API_BASE_URL}/auth/login",
-                        json={"email": email, "password": password},
-                    )
-                    if r.status_code == 200:
-                        data = r.json()
-                        st.session_state.is_authenticated = True
-                        st.session_state.user_email = data.get("email", email)
-                        go_to("dashboard")
-                        st.rerun()
-                    else:
-                        st.error("Login failed. Please check your credentials.")
-                except Exception as e:
-                    st.error(f"Error connecting to backend: {e}")
-            else:
-                st.error("Please enter both email and password.")
+    if st.button("Experiment (Admin)"):
+        st.session_state.page = "experiment"
 
-        st.markdown(
-            "<div style='margin-top:10px;font-size:12px;text-align:center;color:#e5e7eb;'>Need an account?</div>",
-            unsafe_allow_html=True,
-        )
-        if st.button("Create Account", use_container_width=True):
-            st.session_state.show_register = True
+    st.markdown("---")
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section-label">Backend URL</div>', unsafe_allow_html=True)
+    st.sidebar.code(API_BASE_URL, line_numbers=False)
+    st.markdown(
+        '<p style="font-size:0.7rem;color:#6b7280;margin-top:0.35rem;">All requests are sent directly from this UI to the configured backend.</p>',
+        unsafe_allow_html=True,
+    )
 
-    # ------- Registration --------
-    if st.session_state.show_register:
-        st.markdown("<div style='height:26px;'></div>", unsafe_allow_html=True)
-        _, mid, _ = st.columns([1, 1, 1])
-        with mid:
-            st.markdown("<div class='card auth-card'>", unsafe_allow_html=True)
+
+# ======================================================
+#                ADD PRODUCT PAGE
+# ======================================================
+def add_product_page():
+    st.markdown(
+        """
+        <div class="page-header">
+            <div>
+                <div class="page-title">New Product</div>
+                <div class="page-subtitle">
+                    Define a product, upload an image, and configure price variants to start a new experiment.
+                </div>
+            </div>
+            <div class="page-pill">
+                <span class="page-pill-dot"></span>
+                <span>Admin • Setup</span>
+            </div>
+        </div>
+        <div class="divider-soft"></div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col_main, col_side = st.columns([2.1, 1])
+
+    with col_main:
+        st.markdown('<div class="section-title">Product configuration</div>', unsafe_allow_html=True)
+        st.markdown('<div class="surface-card"><div class="surface-card-inner">', unsafe_allow_html=True)
+
+        with st.form("create_product"):
+            description = st.text_input("Product name")
+            prices_str = st.text_input("Price variants (comma separated)")
+            initial_price = st.number_input("Initial price", min_value=0.0, value=10.0)
+            uploaded_image = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
             st.markdown(
-                "<div class='auth-title'>Create Account</div>",
+                """
+                <div style="font-size:0.76rem;color:#9ca3af;margin-top:0.45rem;">
+                    Use <strong>comma separated values</strong> for price variants. Each value will become a bandit arm.
+                </div>
+                """,
                 unsafe_allow_html=True,
             )
+            submitted = st.form_submit_button("Create product and bandits")
 
-            reg_email = st.text_input(
-                "",
-                placeholder="EMAIL",
-                label_visibility="collapsed",
-                key="reg_email",
-            )
-            reg_password = st.text_input(
-                "",
-                placeholder="PASSWORD",
-                type="password",
-                label_visibility="collapsed",
-                key="reg_password",
-            )
-            reg_confirm = st.text_input(
-                "",
-                placeholder="CONFIRM PASSWORD",
-                type="password",
-                label_visibility="collapsed",
-                key="reg_confirm",
-            )
-            reg_submit = st.button("REGISTER", use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
-            if reg_submit:
-                if not reg_email or not reg_password:
-                    st.error("Email and password are required.")
-                elif reg_password != reg_confirm:
-                    st.error("Passwords do not match.")
-                else:
-                    try:
-                        r = requests.post(
-                            f"{API_BASE_URL}/auth/register",
-                            json={"email": reg_email, "password": reg_password},
-                        )
-                        if r.status_code in (200, 201):
-                            st.success(
-                                "Account created successfully. You can login now."
-                            )
-                            st.session_state.show_register = False
-                        else:
-                            st.error("Register failed. Please try again.")
-                    except Exception:
-                        st.error("Backend error. Please check your server.")
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
-
-# -------------------------- DASHBOARD ------------------------------
-def dashboard_page():
-    projects = fetch_projects()
-
-    st.markdown(
-        "<div class='section-title'>Dashboard / Overview</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<div class='section-subtitle'>High-level view of your ongoing pricing experiments and performance trends.</div>",
-        unsafe_allow_html=True,
-    )
-
-    top = st.columns([1.1, 2])
-    with top[0]:
-        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    with col_side:
+        st.markdown('<div class="section-title">How it works</div>', unsafe_allow_html=True)
         st.markdown(
-            "<div class='metric-label'>Total Projects</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"<div class='metric-value'>{len(projects)}</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            "<div class='metric-sub'>Projects currently tracked in your adaptive pricing engine.</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # -------- Plotly line chart instead of st.line_chart --------
-    with top[1]:
-        dates = pd.date_range("2024-08-01", periods=10, freq="7D")
-        line_one = (
-            np.linspace(0.8, 2.0, len(dates))
-            + np.random.uniform(-0.2, 0.2, len(dates))
-        )
-        df_chart = pd.DataFrame(
-            {"date": dates, "Revenue Index": line_one}
-        )
-
-        st.markdown(
-            "<div style='font-size:13px;color:#e5e7eb;margin-bottom:4px;'>Revenue Trend (Synthetic)</div>",
-            unsafe_allow_html=True,
-        )
-
-        fig = px.line(
-            df_chart,
-            x="date",
-            y="Revenue Index",
-            markers=True,
-        )
-        fig.update_layout(
-            margin=dict(l=10, r=10, t=10, b=10),
-            xaxis_title="Date",
-            yaxis_title="Revenue Index",
-            template="plotly_dark",
-            height=260,
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-# --------------------- PRODUCT DETAILS PAGE ------------------------
-def product_details_page():
-    projects = fetch_projects()
-    st.markdown(
-        "<div class='section-title'>Products / Status</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<div class='section-subtitle'>Inspect each experiment, current bandits, and the best-performing prices so far.</div>",
-        unsafe_allow_html=True,
-    )
-
-    if not projects:
-        st.info("No products yet. Add a product to start an experiment.")
-        return
-
-    container = st.container()
-    with container:
-        project_map = {p["project_id"]: p for p in projects}
-        selected_id = st.selectbox(
-            "Select Product",
-            list(project_map.keys()),
-            format_func=lambda pid: project_map[pid]["description"],
-        )
-
-        bandits = fetch_bandits_for_project(selected_id)
-        if not bandits:
-            st.warning("No bandits created yet for this product.")
-            return
-
-        best = max(bandits, key=lambda b: float(b["mean"]))
-        best_price = to_float(best["price"])
-
-        st.markdown(
-            f"""
-            <div class="card-plain" style="margin-top:10px;margin-bottom:18px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
-                    <div>
-                        <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;">Optimal Price (Current Estimate)</div>
-                        <div style="font-size:26px;font-weight:700;color:#f9fafb;margin-top:4px;">${best_price:.2f}</div>
-                        <div style="font-size:12px;color:#9ca3af;margin-top:4px;">Based on Thompson Sampling posterior mean reward.</div>
-                    </div>
-                    <div class="chip">
-                        <div class="chip-dot"></div>
-                        <span>Active Bandits: {len(bandits)}</span>
-                    </div>
-                </div>
+            """
+            <div class="surface-soft" style="font-size:0.8rem;color:#9ca3af;">
+                <ol style="padding-left:1.1rem;margin:0;">
+                    <li style="margin-bottom:0.4rem;">
+                        Provide a <strong>name</strong> for your product.
+                    </li>
+                    <li style="margin-bottom:0.4rem;">
+                        Add one or more <strong>price variants</strong>. Each price defines a separate policy.
+                    </li>
+                    <li style="margin-bottom:0.4rem;">
+                        Optionally <strong>upload an image</strong> to improve the customer view.
+                    </li>
+                    <li>
+                        The system automatically creates a project and bandits for Thompson sampling.
+                    </li>
+                </ol>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        rows = [
-            {
-                "Price": to_float(b["price"]),
-                "Trials": b["trial"],
-                "Reward Sum": to_float(b["reward"]),
-                "Mean Reward": to_float(b["mean"]),
-            }
-            for b in bandits
-        ]
+    if not submitted:
+        return
+
+    if not description:
+        st.error("Product name is required.")
+        return
+
+    # Parse prices
+    if prices_str:
+        try:
+            prices = [float(x.strip()) for x in prices_str.split(",") if x.strip()]
+        except:
+            st.error("Invalid price list.")
+            return
+    else:
+        prices = [float(initial_price)]
+
+    proj = create_project(description, len(prices), prices[0])
+    if not proj or "project_id" not in proj:
+        st.error("Could not create project.")
+        return
+
+    pid = proj["project_id"]
+
+    # Upload image
+    if uploaded_image:
+        files = {"file": (uploaded_image.name, uploaded_image, uploaded_image.type)}
+        _safe_request("POST", f"{API_BASE_URL}/projects/{pid}/upload-image", files=files)
+
+    # Create bandits
+    for p in prices:
+        create_bandit(pid, p)
+
+    st.session_state.current_project_id = pid
+    st.session_state.page = "experiment"
+    st.rerun()
+
+
+# ======================================================
+#                EXPERIMENT PAGE
+# ======================================================
+def experiment_page():
+    st.markdown(
+        """
+        <div class="page-header">
+            <div>
+                <div class="page-title">Experiment Console</div>
+                <div class="page-subtitle">
+                    Monitor bandit performance and manually trigger Thompson sampling decisions.
+                </div>
+            </div>
+            <div class="page-pill">
+                <span class="page-pill-dot"></span>
+                <span>Admin • Live experiment</span>
+            </div>
+        </div>
+        <div class="divider-soft"></div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    pid = st.session_state.current_project_id
+    if not pid:
+        projs = fetch_projects()
+        if not projs:
+            st.info("No projects found.")
+            return
+
+        st.markdown('<div class="section-title">Project selection</div>', unsafe_allow_html=True)
+        with st.container():
+            col_left, col_right = st.columns([2, 1])
+            with col_left:
+                pid = st.selectbox("Choose a project", [p["project_id"] for p in projs])
+            with col_right:
+                st.markdown("<div style='height:1.6rem;'></div>", unsafe_allow_html=True)
+                if st.button("Load selected project", type="primary"):
+                    st.session_state.current_project_id = pid
+                    st.rerun()
+        return
+
+    bandits = fetch_bandits(pid)
+
+    summary_cols = st.columns([1.4, 1.4, 1.2])
+    if bandits:
+        df = pd.DataFrame(
+            [
+                {
+                    "bandit_id": b["bandit_id"],
+                    "price": float(b["price"]),
+                    "mean": float(b["mean"]),
+                    "variance": float(b["variance"]),
+                    "reward_sum": float(b["reward"]),
+                    "trials": int(b["trial"]),
+                }
+                for b in bandits
+            ]
+        )
+
+        # Summary metrics (purely visual, no logic change)
+        with summary_cols[0]:
+            best_idx = df["mean"].idxmax()
+            best_price = df.loc[best_idx, "price"]
+            best_mean = df.loc[best_idx, "mean"]
+            st.markdown(
+                f"""
+                <div class="metric-card">
+                    <div class="metric-label">Current best price</div>
+                    <div class="metric-value">${best_price:.2f}</div>
+                    <div class="metric-tag">
+                        <span class="metric-tag-dot"></span>
+                        <span>Expected reward {best_mean:.3f}</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with summary_cols[1]:
+            total_trials = int(df["trials"].sum())
+            st.markdown(
+                f"""
+                <div class="metric-card" style="background:linear-gradient(135deg,#0f172a,#1f2937);border-color:rgba(148,163,184,0.45);box-shadow:0 14px 32px rgba(15,23,42,0.9);">
+                    <div class="metric-label">Total trials</div>
+                    <div class="metric-value">{total_trials}</div>
+                    <div class="metric-tag">
+                        <span class="metric-tag-dot" style="background:#38bdf8;"></span>
+                        <span>Across all bandits</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with summary_cols[2]:
+            st.markdown(
+                """
+                <div class="surface-soft" style="font-size:0.75rem;color:#9ca3af;">
+                    The best price is computed from the current posterior means of each bandit.
+                    Use manual decisions below to simulate customer behavior and refine these estimates.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('<div class="section-title">Bandit state</div>', unsafe_allow_html=True)
+        st.dataframe(df, use_container_width=True)
+
+    st.markdown('<div class="section-title">Control</div>', unsafe_allow_html=True)
+    control_col_left, control_col_right = st.columns([1.5, 1])
+
+    with control_col_left:
+        st.markdown('<div class="surface-soft">', unsafe_allow_html=True)
         st.markdown(
-            "<div style='font-size:13px;color:#e5e7eb;margin-bottom:4px;'>Bandit Statistics</div>",
+            """
+            <div style="font-size:0.78rem;color:#9ca3af;margin-bottom:0.35rem;">
+                Trigger a Thompson sampling step. The selected price will also be reflected in the customer-facing shop.
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-        st.dataframe(rows, use_container_width=True)
+        if st.button("Sample price using Thompson", type="primary"):
+            r = thompson_select(pid)
+            if r:
+                st.success(f"Selected price ${float(r['price']):.2f}")
+                st.session_state.current_bandit_id = r["bandit_id"]
+                st.session_state.last_price = float(r["price"])
+                st.session_state.customer_refresh = True
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        # Buttons (Run Algorithm + Plot + Simulation)
-        col1, col2 = st.columns(2)
+    with control_col_right:
+        st.markdown('<div class="surface-soft">', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div style="font-size:0.78rem;color:#9ca3af;margin-bottom:0.45rem;">
+                Inspect the current posterior distributions over conversion for all bandits.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("Show posterior plot"):
+            img = fetch_posterior_plot(pid)
+            if img:
+                st.image(img, use_column_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        # ----- Run Thompson Sampling -----
-        with col1:
-            if st.button("Run Algorithm", use_container_width=True):
-                res = run_algorithm_for_project(selected_id)
-                if res:
-                    price_val = float(res.get("price", 0))
-                    st.success(f"New price selected: ${price_val:.2f}")
-                else:
-                    st.error("Failed to run algorithm. Please check backend logs.")
+    bid = st.session_state.current_bandit_id
+    if not bid:
+        st.info("No bandit selected yet. Sample using Thompson to choose a price.")
+        return
 
-        # ----- Plot & Simulation in SAME BLOCK -----
-        with col2:
-            if st.button("Show Posterior Plot", use_container_width=True):
-                plot_url = f"{API_BASE_URL}/projects/{selected_id}/thompson/plot"
+    st.markdown('<div class="section-title">Manual outcomes</div>', unsafe_allow_html=True)
+    colA, colB = st.columns(2)
 
-                try:
-                    plot_response = requests.get(plot_url)
-
-                    if plot_response.status_code == 200:
-                        st.image(
-                            plot_response.content,
-                            caption="Posterior Distributions of Bandits",
-                        )
-                    else:
-                        st.error(
-                            f"Error fetching plot: {plot_response.text}"
-                        )
-
-                except Exception as e:
-                    st.error(f"Could not load plot: {e}")
-
-            if st.button(
-                "Run Full Simulation (Updates Model)", use_container_width=True
-            ):
-                sim_res = requests.post(
-                    f"{API_BASE_URL}/projects/{selected_id}/thompson/run",
-                    json={"n_trials": 50},
-                )
-                if sim_res.status_code == 200:
-                    st.success("Simulation finished! Try the plot again.")
-                    st.rerun()
-                else:
-                    st.error(f"Error running simulation: {sim_res.text}")
-
-
-# ------------------------- ADD PRODUCT -----------------------------
-def add_product_page():
-    st.markdown(
-        "<div class='section-title'>Add New Product</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<div class='section-subtitle'>Define a new pricing experiment by specifying a product and the candidate prices to test.</div>",
-        unsafe_allow_html=True,
-    )
-
-    top_cols = st.columns([3, 1])
-    with top_cols[1]:
-        st.markdown("<div class='right-button'>", unsafe_allow_html=True)
-        if st.button("Back to Dashboard", use_container_width=True):
-            go_to("dashboard")
+    with colA:
+        st.markdown('<div class="surface-soft">', unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:0.8rem;color:#9ca3af;margin-bottom:0.35rem;'>Record a successful purchase for the currently selected bandit.</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Record buy (admin)", type="primary"):
+            submit_reward(bid, 1.0, "buy_admin")
+            st.session_state.customer_refresh = True
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-
-    with st.form("add_product_form"):
-        st.markdown("<div class='card-plain'>", unsafe_allow_html=True)
-
-        product_name = st.text_input(
-            "",
-            placeholder="PRODUCT NAME",
-            label_visibility="collapsed",
-        )
-        price_variants_str = st.text_input(
-            "",
-            placeholder="ENTER PRICE VARIANTS TO TEST (e.g. 10, 15, 20)",
-            label_visibility="collapsed",
-        )
-
+    with colB:
+        st.markdown('<div class="surface-soft">', unsafe_allow_html=True)
         st.markdown(
-            "<div style='font-size:11px;color:#9ca3af;margin-top:8px;'>Provide at least one price. The system will create one bandit per price and initialize Thompson Sampling.</div>",
+            "<div style='font-size:0.8rem;color:#9ca3af;margin-bottom:0.35rem;'>Record a non-purchase for the currently selected bandit.</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Record no-buy (admin)"):
+            submit_reward(bid, 0.0, "no_buy_admin")
+            st.session_state.customer_refresh = True
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ======================================================
+#                CUSTOMER PAGE
+# ======================================================
+def customer_page():
+    st.markdown(
+        """
+        <div class="page-header">
+            <div>
+                <div class="page-title">Shop</div>
+                <div class="page-subtitle">
+                    Explore the catalog. Each price you see is generated by a live pricing experiment.
+                </div>
+            </div>
+            <div class="page-pill">
+                <span class="page-pill-dot"></span>
+                <span>Customer • Live pricing</span>
+            </div>
+        </div>
+        <div class="divider-soft"></div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    projects = fetch_projects()
+    if not projects:
+        st.info("No products available.")
+        return
+
+    top_bar_left, top_bar_right = st.columns([1.5, 2])
+    with top_bar_left:
+        if st.button("Refresh prices", type="primary"):
+            st.session_state.customer_refresh = True
+
+    with top_bar_right:
+        st.markdown(
+            """
+            <div style="font-size:0.78rem;color:#9ca3af;margin-top:0.35rem;">
+                Prices are personalized per refresh using Thompson sampling over observed purchase behavior.
+            </div>
+            """,
             unsafe_allow_html=True,
         )
 
-        start_clicked = st.form_submit_button("START EXPERIMENT")
+    # Refresh Thompson samples
+    if st.session_state.customer_refresh:
+        offers = {}
+        for p in projects:
+            pid = p["project_id"]
+            r = thompson_select(pid)
+            if r:
+                offers[pid] = {
+                    "bandit_id": r["bandit_id"],
+                    "price": float(r["price"]),
+                }
+        st.session_state.customer_offers = offers
+        st.session_state.customer_refresh = False
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    offers = st.session_state.customer_offers
 
-    if start_clicked:
-        if not product_name:
-            st.error("Product name is required.")
-            return
+    st.markdown('<div class="section-title">Products</div>', unsafe_allow_html=True)
 
-        # Parse prices
-        try:
-            prices = [
-                float(p.strip())
-                for p in price_variants_str.split(",")
-                if p.strip()
-            ]
-        except Exception:
-            st.error("Invalid price format. Use comma-separated numeric values.")
-            return
+    # --- DISPLAY PRODUCTS ---
+    for p in projects:
+        pid = p["project_id"]
+        pname = p["description"]
 
-        number_bandits = len(prices) if prices else 1
+        img_url = make_public_image_url(p.get("image_path"))
 
-        # --------------------------
-        # 1) CREATE PROJECT
-        # --------------------------
-        payload = {"description": product_name, "number_bandits": number_bandits}
-        r = requests.post(f"{API_BASE_URL}/projects", json=payload)
+        offer = offers.get(pid)
+        if not offer:
+            continue
 
-        try:
-            project = r.json()
-            project_id = project.get("project_id")
-        except Exception:
-            st.error(f"Failed to create product: {r.text}")
-            return
+        price = offer["price"]
+        bid = offer["bandit_id"]
 
-        st.success(f"Project created successfully! Project ID = {project_id}")
+        st.markdown('<div class="product-card"><div class="product-card-inner">', unsafe_allow_html=True)
 
-        # --------------------------
-        # 2) CREATE BANDITS
-        # --------------------------
-        if not prices:
-            prices = [0.0]
+        cols = st.columns([1.4, 2.4, 1.2, 1.2])
 
-        created_bandits = 0
-        for price in prices:
-            rb = requests.post(
-                f"{API_BASE_URL}/projects/{project_id}/bandits",
-                json={"price": price},
+        # IMAGE
+        with cols[0]:
+            if img_url:
+                st.image(img_url, width=150)
+            else:
+                st.markdown(
+                    "<div class='product-image-placeholder'>No image available</div>",
+                    unsafe_allow_html=True,
+                )
+
+        # NAME + CONTEXT
+        with cols[1]:
+            st.markdown(f"<div class='product-title'>{pname}</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='product-sub'>This product is currently part of a live pricing experiment.</div>",
+                unsafe_allow_html=True,
             )
-            if rb.status_code in (200, 201):
-                created_bandits += 1
-
-        st.success(f"Created {created_bandits} bandits successfully.")
-
-        # --------------------------
-        # 3) RUN ALGORITHM ONCE
-        # --------------------------
-        res = run_algorithm_for_project(project_id)
-        if res and "price" in res:
-            st.success(
-                f"Thompson Sampling suggested starting price: ${float(res['price']):.2f}"
+            st.markdown(
+                """
+                <div style="margin-top:0.6rem;">
+                    <div class="product-meta-label">Experiment note</div>
+                    <div class="product-meta-value">
+                        The price you see is sampled from a probabilistic model that learns from aggregated customer decisions.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-        else:
-            st.info("Project created. Waiting for reward data before convergence.")
+
+        # PRICE CARD
+        with cols[2]:
+            st.markdown(
+                f"""
+                <div class="metric-card">
+                    <div class="metric-label">Current price</div>
+                    <div class="metric-value">${price:.2f}</div>
+                    <div class="metric-tag">
+                        <span class="metric-tag-dot"></span>
+                        <span>Adaptive offer</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        # ACTIONS
+        with cols[3]:
+            st.markdown(
+                "<div style='display:flex;flex-direction:column;gap:0.4rem;margin-top:0.2rem;'>",
+                unsafe_allow_html=True,
+            )
+            if st.button("Buy now", key=f"buy_{pid}", type="primary"):
+                submit_reward(bid, 1.0, "buy_customer")
+                st.session_state.customer_refresh = True
+                st.rerun()
+
+            if st.button("Not now", key=f"nobuy_{pid}"):
+                submit_reward(bid, 0.0, "no_buy_customer")
+                st.session_state.customer_refresh = True
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
 
-# ----------------------------- ROUTER -------------------------------
-if st.session_state.page == "auth":
-    auth_page()
+# ==== MAIN ROUTER ====
+st.markdown("<div class='divider-soft'></div>", unsafe_allow_html=True)
+
+if st.session_state.page == "add":
+    add_product_page()
+elif st.session_state.page == "experiment":
+    experiment_page()
 else:
-    render_header()
-    if st.session_state.page == "dashboard":
-        dashboard_page()
-    elif st.session_state.page == "product_details":
-        product_details_page()
-    elif st.session_state.page == "add_product":
-        add_product_page()
+    customer_page()
