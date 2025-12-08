@@ -644,8 +644,8 @@ def experiment_page():
 
     if project_data:
         product_name = project_data.get("description", "Unnamed Product")
-        raw_image = project_data.get("image_url")
-        product_image = make_public_image_url(raw_image)
+        product_image = project_data.get("image_url")
+
 
         with prod_col1:
             st.markdown(

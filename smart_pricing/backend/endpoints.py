@@ -78,7 +78,7 @@ def upload_project_image(
     if not project:
         raise HTTPException(404, "Project not found")
 
-    folder = "/backend/images"
+    folder = "backend/images"
     os.makedirs(folder, exist_ok=True)
 
     ext = file.filename.split(".")[-1]
@@ -115,35 +115,6 @@ def get_project(project_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Project not found")
     return project
 
-# ======================================================
-#  GET Image UPLOAD
-# ======================================================
-@router.post("/projects/{project_id}/upload-image")
-def upload_project_image(
-    project_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    project = db.query(Project).filter(Project.project_id == project_id).first()
-    if not project:
-        raise HTTPException(404, "Project not found")
-
-    # save to static folder
-    upload_dir = "static/uploads"
-    os.makedirs(upload_dir, exist_ok=True)
-
-    filename = f"project_{project_id}_{file.filename}"
-    file_path = os.path.join(upload_dir, filename)
-
-    with open(file_path, "wb") as f:
-        f.write(file.file.read())
-
-    # store URL path (served by FastAPI static mount)
-    project.image_url = f"/static/uploads/{filename}"
-    db.commit()
-    db.refresh(project)
-
-    return {"image_url": project.image_url}
 
 
 
