@@ -407,6 +407,10 @@ def _safe_request(method: str, url: str, **kwargs) -> Optional[requests.Response
         return None
 
 # ==== API HELPERS ====
+def fetch_project(project_id: int):
+    r = _safe_request("GET", f"{API_BASE_URL}/projects/{project_id}")
+    return r.json() if r and r.status_code == 200 else None
+
 def fetch_projects():
     r = _safe_request("GET", f"{API_BASE_URL}/projects")
     return r.json() if r and r.status_code == 200 else []
@@ -472,13 +476,14 @@ with st.sidebar:
 #                ADD PRODUCT PAGE
 # ======================================================
 def add_product_page():
+    # ---------- HEADER ----------
     st.markdown(
         """
         <div class="page-header">
             <div>
                 <div class="page-title">New Product</div>
                 <div class="page-subtitle">
-                    Define a product, upload an image, and configure price variants to start a new experiment.
+                    Define the product, upload an image, and configure price variants to start an experiment.
                 </div>
             </div>
             <div class="page-pill">
@@ -491,25 +496,28 @@ def add_product_page():
         unsafe_allow_html=True,
     )
 
-    col_main, col_side = st.columns([2.1, 1])
+    # ---------- LAYOUT ----------
+    col_main, col_side = st.columns([2.2, 1])
 
-    # ========== LEFT SIDE (Form) ==========
+    # ---------------------------------
+    # LEFT PANEL — PRODUCT FORM
+    # ---------------------------------
     with col_main:
-        st.markdown('<div class="section-title">Product configuration</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Product Configuration</div>', unsafe_allow_html=True)
         st.markdown('<div class="surface-card"><div class="surface-card-inner">', unsafe_allow_html=True)
 
-        with st.form("create_product"):
-            description = st.text_input("Product name")
-            prices_str = st.text_input("Price variants (comma separated)")
+        with st.form("product_form"):
+            product_name = st.text_input("Product name")
+
+            price_input = st.text_input("Price variants (comma separated)")
             initial_price = st.number_input("Initial price", min_value=0.0, value=10.0)
-            uploaded_image = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
+
+            uploaded_image = st.file_uploader("Upload image (optional)", type=["png", "jpg", "jpeg"])
 
             st.markdown(
-                """
-                <div style="font-size:0.76rem;color:#9ca3af;margin-top:0.45rem;">
-                    Use <strong>comma separated values</strong> for price variants. Each value will become a bandit arm.
-                </div>
-                """,
+                "<div style='font-size:0.75rem;color:#9ca3af;'>"
+                "Enter comma-separated prices. If left empty, the initial price will be used."
+                "</div>",
                 unsafe_allow_html=True,
             )
 
@@ -517,207 +525,69 @@ def add_product_page():
 
         st.markdown("</div></div>", unsafe_allow_html=True)
 
-    # ========== RIGHT SIDE ==========
+    # ---------------------------------
+    # RIGHT PANEL — INSTRUCTIONS
+    # ---------------------------------
     with col_side:
-        st.markdown('<div class="section-title">How it works</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">How It Works</div>', unsafe_allow_html=True)
         st.markdown(
             """
             <div class="surface-soft" style="font-size:0.8rem;color:#9ca3af;">
-                <ol style="padding-left:1.1rem;margin:0;">
-                    <li>Provide a <strong>name</strong> for your product.</li>
-                    <li>Add <strong>price variants</strong>. Each price defines a separate policy.</li>
-                    <li>Optionally <strong>upload an image</strong>.</li>
-                    <li>The system creates a project and bandits.</li>
-                </ol>
+                <ul style="padding-left:1.1rem;margin:0;">
+                    <li>Enter the product name.</li>
+                    <li>Add one or more price variants.</li>
+                    <li>Optionally upload an image.</li>
+                    <li>The system creates a new project and bandits for each price.</li>
+                </ul>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-    # ========== STOP HERE UNTIL FORM SUBMITTED ==========
+    # ---------- STOP IF FORM NOT SUBMITTED ----------
     if not submitted:
         return
 
-    # ========== VALIDATION ==========
-    if not description:
+    # ---------- VALIDATION ----------
+    if not product_name.strip():
         st.error("Product name is required.")
         return
 
-    # Parse prices ONCE
+    # Parse prices
     try:
-        if prices_str.strip():
-            raw_prices = [p.strip() for p in prices_str.split(",") if p.strip()]
-            prices = [float(p) for p in raw_prices]
-
-            if any(p < 0 for p in prices):
-                st.error("Prices cannot be negative.")
-                return
+        if price_input.strip():
+            prices = [float(p.strip()) for p in price_input.split(",") if p.strip()]
         else:
-            # Fallback to initial price
-            if initial_price < 0:
-                st.error("Initial price cannot be negative.")
-                return
             prices = [float(initial_price)]
-
     except ValueError:
-        st.error("Invalid price format. Use numbers separated by commas.")
+        st.error("Invalid price list. Use numbers separated by commas.")
         return
 
-    # ========== CREATE PROJECT ==========
-    proj = create_project(description, len(prices), prices[0])
-    if not proj or "project_id" not in proj:
-        st.error("Could not create project.")
+    if any(p < 0 for p in prices):
+        st.error("Prices cannot be negative.")
         return
 
-    pid = proj["project_id"]
+    # ---------- CREATE PROJECT ----------
+    project = create_project(product_name, len(prices), prices[0])
+    if not project or "project_id" not in project:
+        st.error("Failed to create project.")
+        return
 
-    # ========== UPLOAD IMAGE (optional) ==========
+    pid = project["project_id"]
+
+    # ---------- OPTIONAL IMAGE UPLOAD ----------
     if uploaded_image:
         files = {"file": (uploaded_image.name, uploaded_image, uploaded_image.type)}
         _safe_request("POST", f"{API_BASE_URL}/projects/{pid}/upload-image", files=files)
 
-    # ========== CREATE BANDITS ==========
-    for p in prices:
-        create_bandit(pid, p)
+    # ---------- CREATE BANDITS ----------
+    for price in prices:
+        create_bandit(pid, price)
 
-    # SUCCESS
-    st.success(f"Product '{description}' has been successfully added!")
+    # ---------- SUCCESS UI ----------
+    st.success(f"Product '{product_name}' has been successfully created!")
 
-    # ========== NAVIGATE TO EXPERIMENT PAGE ==========
-    st.session_state.current_project_id = pid
-    st.session_state.page = "Experiment"
-    st.rerun()
 
-    st.markdown(
-        """
-        <div class="page-header">
-            <div>
-                <div class="page-title">New Product</div>
-                <div class="page-subtitle">
-                    Define a product, upload an image, and configure price variants to start a new experiment.
-                </div>
-            </div>
-            <div class="page-pill">
-                <span class="page-pill-dot"></span>
-                <span>Admin • Setup</span>
-            </div>
-        </div>
-        <div class="divider-soft"></div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    col_main, col_side = st.columns([2.1, 1])
-
-    with col_main:
-        st.markdown('<div class="section-title">Product configuration</div>', unsafe_allow_html=True)
-        st.markdown('<div class="surface-card"><div class="surface-card-inner">', unsafe_allow_html=True)
-
-        with st.form("create_product"):
-            description = st.text_input("Product name")
-            prices_str = st.text_input("Price variants (comma separated)")
-            initial_price = st.number_input("Initial price", min_value=0.0, value=10.0)
-            uploaded_image = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
-            st.markdown(
-                """
-                <div style="font-size:0.76rem;color:#9ca3af;margin-top:0.45rem;">
-                    Use <strong>comma separated values</strong> for price variants. Each value will become a bandit arm.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            submitted = st.form_submit_button("Create product and bandits")
-
-        st.markdown("</div></div>", unsafe_allow_html=True)
-
-    with col_side:
-        st.markdown('<div class="section-title">How it works</div>', unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div class="surface-soft" style="font-size:0.8rem;color:#9ca3af;">
-                <ol style="padding-left:1.1rem;margin:0;">
-                    <li style="margin-bottom:0.4rem;">
-                        Provide a <strong>name</strong> for your product.
-                    </li>
-                    <li style="margin-bottom:0.4rem;">
-                        Add one or more <strong>price variants</strong>. Each price defines a separate policy.
-                    </li>
-                    <li style="margin-bottom:0.4rem;">
-                        Optionally <strong>upload an image</strong> to improve the customer view.
-                    </li>
-                    <li>
-                        The system automatically creates a project and bandits for Thompson sampling.
-                    </li>
-                </ol>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    if not submitted:
-        return
-
-    if not description:
-        st.error("Product name is required.")
-        return
-
-    # Parse prices
-    if prices_str:
-        try:
-            prices = [float(x.strip()) for x in prices_str.split(",") if x.strip()]
-        except Exception:
-            st.error("Invalid price list.")
-            return
-    else:
-        prices = [float(initial_price)]
-
-    proj = create_project(description, len(prices), prices[0])
-    if not proj or "project_id" not in proj:
-        st.error("Could not create project.")
-        return
-
-    pid = proj["project_id"]
-
-    # Upload image
-    if uploaded_image:
-        files = {"file": (uploaded_image.name, uploaded_image, uploaded_image.type)}
-        _safe_request("POST", f"{API_BASE_URL}/projects/{pid}/upload-image", files=files)
-
-    # Create bandits
-    for p in prices:
-        create_bandit(pid, p)
-
-    st.success(f"Product '{description}' has been successfully added!")
-    
-    # Parse prices
-    if prices_str:
-        try:
-            raw_prices = [x.strip() for x in prices_str.split(",") if x.strip()]
-            if not raw_prices:
-                st.error("Please enter at least one price value.")
-                return
-
-            prices = []
-            for p in raw_prices:
-                value = float(p)
-                if value < 0:
-                    st.error("Prices cannot be negative. Please fix your list.")
-                    return
-                prices.append(value)
-
-        except ValueError:
-            st.error("Invalid price format. Use only numbers separated by commas.")
-            return
-    else:
-        # No list provided → fallback to initial price
-        if initial_price < 0:
-            st.error("Initial price cannot be negative.")
-            return
-        prices = [float(initial_price)]
-
-    st.session_state.current_project_id = pid
-    st.session_state.page = "Experiment"
-    st.rerun()
 
 # ======================================================
 #                EXPERIMENT PAGE
@@ -742,6 +612,9 @@ def experiment_page():
         unsafe_allow_html=True,
     )
 
+    # -----------------------------------------------------
+    # 1. Ensure project is selected
+    # -----------------------------------------------------
     pid = st.session_state.current_project_id
     if not pid:
         projs = fetch_projects()
@@ -761,6 +634,42 @@ def experiment_page():
                     st.rerun()
         return
 
+    # -----------------------------------------------------
+    # 2. PRODUCT INFO SECTION
+    # -----------------------------------------------------
+    project_data = fetch_project(pid)
+
+    st.markdown('<div class="section-title">Product</div>', unsafe_allow_html=True)
+    prod_col1, prod_col2 = st.columns([1.5, 1])
+
+    if project_data:
+        product_name = project_data.get("description", "Unnamed Product")
+        raw_image = project_data.get("image_url")
+        product_image = make_public_image_url(raw_image)
+
+        with prod_col1:
+            st.markdown(
+                f"""
+                <div style="font-size:1.2rem;font-weight:600;margin-bottom:0.3rem;">
+                    {product_name}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        with prod_col2:
+            if product_image:
+                st.image(product_image, use_container_width=True)
+            else:
+                st.info("No product image available.")
+    else:
+        st.warning("Could not load product details.")
+
+    st.markdown("<div class='divider-soft'></div>", unsafe_allow_html=True)
+
+    # -----------------------------------------------------
+    # 3. LOAD BANDITS
+    # -----------------------------------------------------
     bandits = fetch_bandits(pid)
     df = pd.DataFrame()
 
@@ -779,14 +688,15 @@ def experiment_page():
             ]
         )
 
-        # Bandit table
-        st.markdown('<div class="section-title">Bandit state</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Bandit State</div>', unsafe_allow_html=True)
         st.dataframe(df, use_container_width=True)
 
-        # ===== SUMMARY KPIs =====
+        # -----------------------------------------------------
+        # 4. KPIs
+        # -----------------------------------------------------
         total_trials = int(df["trials"].sum())
         total_reward = float(df["reward_sum"].sum())
-        conversion_rate = total_reward / total_trials if total_trials > 0 else 0
+        conversion_rate = total_reward / total_trials if total_trials > 0 else 0.0
 
         best_idx = df["mean"].idxmax()
         best_price = df.loc[best_idx, "price"]
@@ -794,167 +704,104 @@ def experiment_page():
 
         kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
-        with kpi_col1:
-            st.metric("Total Trials", total_trials)
+        kpi_col1.metric("Total Trials", total_trials)
+        kpi_col2.metric("Total Reward", f"{total_reward:.0f}")
+        kpi_col3.metric("Conversion Rate", f"{conversion_rate:.2%}")
+        kpi_col4.metric("Best Price", f"${best_price:.2f}", f"{best_mean:.3f}")
 
-        with kpi_col2:
-            st.metric("Total Reward", f"{total_reward:.0f}")
-
-        with kpi_col3:
-            st.metric("Conversion Rate", f"{conversion_rate:.2%}")
-
-        with kpi_col4:
-            st.metric("Best Price (by expected reward)", f"${best_price:.2f}", f"{best_mean:.3f}")
-
-        # ===== BANDIT COMPARISON CHART =====
+        # -----------------------------------------------------
+        # 5. CHARTS
+        # -----------------------------------------------------
         st.subheader("Bandit Performance Comparison")
+        comparison_df = df[["price", "mean"]]
+        st.bar_chart(comparison_df.set_index("price"), use_container_width=True)
 
-        comparison_df = df[["price", "mean", "trials"]]
-        st.bar_chart(
-            comparison_df.set_index("price")[["mean"]],
-            use_container_width=True,
-        )
-
-        # ===== TIME-SERIES PERFORMANCE CHART =====
-        st.subheader("Performance Over Time (Cumulative Trials)")
-
+        st.subheader("Performance Over Time (Rolling Conversion)")
         if total_trials > 0:
-            timeline_df = pd.DataFrame(
-                {
-                    "trial": np.arange(1, total_trials + 1),
-                    "conversion": [1] * int(total_reward) + [0] * (total_trials - int(total_reward)),
-                }
-            )
+            timeline_df = pd.DataFrame({
+                "trial": np.arange(1, total_trials + 1),
+                "conversion": [1] * int(total_reward) + [0] * (total_trials - int(total_reward)),
+            })
             timeline_df["rolling_rate"] = timeline_df["conversion"].rolling(20, min_periods=1).mean()
 
-            st.line_chart(
-                timeline_df.set_index("trial")[["rolling_rate"]],
-                use_container_width=True,
+            st.line_chart(timeline_df.set_index("trial")[["rolling_rate"]], use_container_width=True)
+
+        # -----------------------------------------------------
+        # 6. POSTERIOR PLOTS
+        # -----------------------------------------------------
+        st.subheader("Posterior Distributions (Thompson Sampling)")
+        if not df.empty:
+            bandit_curves = []
+
+            for _, row in df.iterrows():
+                mean = float(row["mean"])
+                var = float(row["variance"])
+                std = max(var, 1e-6) ** 0.5
+                price = float(row["price"])
+                bandit_id = int(row["bandit_id"])
+
+                xs = np.linspace(mean - 4 * std, mean + 4 * std, 200)
+
+                for x in xs:
+                    bandit_curves.append({
+                        "x": x,
+                        "density": norm.pdf(x, mean, std),
+                        "bandit": f"Bandit {bandit_id} | price={price}"
+                    })
+
+            chart_df = pd.DataFrame(bandit_curves)
+
+            posterior_chart = (
+                alt.Chart(chart_df)
+                .mark_line()
+                .encode(
+                    x=alt.X("x:Q", title="Expected Reward"),
+                    y=alt.Y("density:Q", title="Density"),
+                    color=alt.Color("bandit:N", title="Bandit"),
+                )
+                .properties(height=350, width="container")
+                .interactive()
             )
+            st.altair_chart(posterior_chart, use_container_width=True)
+
     else:
         st.info("No bandits found for this project.")
 
-    # ==== POSTERIOR DISTRIBUTIONS (NATIVE STREAMLIT PLOT) ====
-    st.subheader("Posterior Distributions (Thompson Sampling)")
-
-    if not df.empty:
-        bandit_curves = []
-
-        for _, row in df.iterrows():
-            mean = float(row["mean"])
-            var = float(row["variance"])
-            std = max(var, 1e-6) ** 0.5
-            price = float(row["price"])
-            bandit_id = int(row["bandit_id"])
-
-            xs = np.linspace(mean - 4 * std, mean + 4 * std, 200)
-
-            for x in xs:
-                bandit_curves.append({
-                    "x": x,
-                    "density": norm.pdf(x, mean, std),
-                    "bandit": f"Bandit {bandit_id} | price={price}"
-                })
-
-        chart_df = pd.DataFrame(bandit_curves)
-
-        posterior_chart = (
-            alt.Chart(chart_df)
-            .mark_line()
-            .encode(
-                x=alt.X("x:Q", title="Expected Reward"),
-                y=alt.Y("density:Q", title="Density"),
-                color=alt.Color("bandit:N", title="Bandit"),
-                tooltip=["bandit", "x", "density"]
-            )
-            .properties(
-                height=350,
-                width="container"
-            )
-            .interactive()
-        )
-
-        st.altair_chart(posterior_chart, use_container_width=True)
-
-    else:
-        st.info("No bandits available for posterior plot.")
-
-    # ===== CONTROL SECTION =====
+    # -----------------------------------------------------
+    # 7. CONTROL SECTION
+    # -----------------------------------------------------
     st.markdown('<div class="section-title">Control</div>', unsafe_allow_html=True)
-    control_col_left, _ = st.columns([1.5, 1])
 
-    with control_col_left:
-        st.markdown('<div class="surface-soft">', unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div style="font-size:0.78rem;color:#9ca3af;margin-bottom:0.35rem;">
-                Trigger a Thompson sampling step. The selected price is what customers will see in the separate customer app.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if st.button("Sample price using Thompson", type="primary"):
-            r = thompson_select(pid)
-            if r:
-                st.success(f"Selected price ${float(r['price']):.2f}")
-                st.session_state.current_bandit_id = r["bandit_id"]
-                st.session_state.last_price = float(r["price"])
-        st.markdown("</div>", unsafe_allow_html=True)
+    if st.button("Sample Price using Thompson", type="primary"):
+        r = thompson_select(pid)
+        if r:
+            st.success(f"Selected price: ${float(r['price']):.2f}")
+            st.session_state.current_bandit_id = r["bandit_id"]
+            st.session_state.last_price = float(r["price"])
 
-    # ===== MANUAL OUTCOMES (ADMIN) =====
-    st.markdown('<div class="section-title">Manual outcomes</div>', unsafe_allow_html=True)
+    # -----------------------------------------------------
+    # 8. MANUAL OUTCOMES
+    # -----------------------------------------------------
+    st.markdown('<div class="section-title">Manual Outcomes</div>', unsafe_allow_html=True)
     colA, colB = st.columns(2)
 
-    current_bandit_id = st.session_state.current_bandit_id
-
     with colA:
-        st.markdown('<div class="surface-soft">', unsafe_allow_html=True)
-        st.markdown(
-            "<div style='font-size:0.8rem;color:#9ca3af;margin-bottom:0.35rem;'>"
-            "Record a successful purchase for the currently selected bandit (last Thompson sample)."
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        if st.button("Record buy (admin)", type="primary"):
-            if current_bandit_id is None:
-                st.warning("No bandit selected yet. Run a Thompson sample first.")
+        if st.button("Record Buy (admin)", type="primary"):
+            bid = st.session_state.current_bandit_id
+            if not bid:
+                st.warning("Run a Thompson sample first.")
             else:
-                submit_reward(current_bandit_id, 1.0, "buy_admin")
+                submit_reward(bid, 1.0, "buy_admin")
                 st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
 
     with colB:
-        st.markdown('<div class="surface-soft">', unsafe_allow_html=True)
-        st.markdown(
-            "<div style='font-size:0.8rem;color:#9ca3af;margin-bottom:0.35rem;'>"
-            "Record a non-purchase for the currently selected bandit."
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        if st.button("Record no-buy (admin)"):
-            if current_bandit_id is None:
-                st.warning("No bandit selected yet. Run a Thompson sample first.")
+        if st.button("Record No-Buy (admin)"):
+            bid = st.session_state.current_bandit_id
+            if not bid:
+                st.warning("Run a Thompson sample first.")
             else:
-                submit_reward(current_bandit_id, 0.0, "no_buy_admin")
+                submit_reward(bid, 0.0, "no_buy_admin")
                 st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown(
-        """
-        ### How to Interpret These Analytics
-
-        **Summary KPIs** give a quick overview of experiment health:
-        - *Total Trials* shows sample size.
-        - *Conversion Rate* helps measure customer interest.
-        - *Best Price* reflects the bandit with the highest expected reward.
-
-        **Bandit Performance Comparison** visualizes which price performs best at the moment.
-
-        **Performance Over Time** shows whether learning is stabilizing or drifting.
-
-        Together, these analytics support clearer and faster decisions about pricing experiments.
-        """
-    )
 
 # ==== MAIN ROUTER ====
 st.markdown("<div class='divider-soft'></div>", unsafe_allow_html=True)
