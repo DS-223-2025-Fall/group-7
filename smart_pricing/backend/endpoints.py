@@ -33,11 +33,17 @@ from models.Response.responses import (
 router = APIRouter()
 
 
+
 # ======================================================
 #  CREATE PROJECT
 # ======================================================
 @router.post("/projects", response_model=CreateProjectResponseModel)
 def create_project(request: CreateProjectRequest, db: Session = Depends(get_db)):
+    """
+    Create a project ONLY.
+    Do NOT auto-create any bandits here.
+    Bandits are created explicitly via /projects/{project_id}/bandits.
+    """
 
     project = Project(
         description=request.description,
@@ -49,20 +55,21 @@ def create_project(request: CreateProjectRequest, db: Session = Depends(get_db))
     db.commit()
     db.refresh(project)
 
-    bandit = Bandit(
-        project_id=project.project_id,
-        price=request.price,
-        mean=0.0,
-        variance=1.0,
-        reward=0.0,
-        trial=0,
-        number_explored=0,
-    )
-    db.add(bandit)
-    db.commit()
+    # ❌ Removed automatic bandit creation here.
+    # Previously we had:
+    # bandit = Bandit(
+    #     project_id=project.project_id,
+    #     price=request.price,
+    #     mean=0.0,
+    #     variance=1.0,
+    #     reward=0.0,
+    #     trial=0,
+    #     number_explored=0,
+    # )
+    # db.add(bandit)
+    # db.commit()
 
     return project
-
 
 # ======================================================
 #  UPLOAD PROJECT IMAGE
@@ -78,7 +85,8 @@ def upload_project_image(
     if not project:
         raise HTTPException(404, "Project not found")
 
-    folder = "backend/images"
+    # Save under /backend/images (WORKDIR is /backend)
+    folder = "/backend/images"
     os.makedirs(folder, exist_ok=True)
 
     ext = file.filename.split(".")[-1]
@@ -88,10 +96,11 @@ def upload_project_image(
     with open(path, "wb") as f:
         f.write(file.file.read())
 
+    # What frontend will use: http://backend:8000 + image_path
     project.image_path = f"/images/{filename}"
     db.commit()
 
-    return {"image_path": project.image_path}
+    return {"message": "Image uploaded", "image_path": project.image_path}
 
 
 # ======================================================

@@ -510,13 +510,12 @@ def add_product_page():
             product_name = st.text_input("Product name")
 
             price_input = st.text_input("Price variants (comma separated)")
-            initial_price = st.number_input("Initial price", min_value=0.0, value=10.0)
 
             uploaded_image = st.file_uploader("Upload image (optional)", type=["png", "jpg", "jpeg"])
 
             st.markdown(
                 "<div style='font-size:0.75rem;color:#9ca3af;'>"
-                "Enter comma-separated prices. If left empty, the initial price will be used."
+                "Enter comma-separated prices, e.g. 10, 20, 30."
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -537,7 +536,7 @@ def add_product_page():
                     <li>Enter the product name.</li>
                     <li>Add one or more price variants.</li>
                     <li>Optionally upload an image.</li>
-                    <li>The system creates a new project and bandits for each price.</li>
+                    <li>The system creates a new project and a bandit for each price.</li>
                 </ul>
             </div>
             """,
@@ -553,12 +552,13 @@ def add_product_page():
         st.error("Product name is required.")
         return
 
+    if not price_input.strip():
+        st.error("You must enter at least one price.")
+        return
+
     # Parse prices
     try:
-        if price_input.strip():
-            prices = [float(p.strip()) for p in price_input.split(",") if p.strip()]
-        else:
-            prices = [float(initial_price)]
+        prices = [float(p.strip()) for p in price_input.split(",") if p.strip()]
     except ValueError:
         st.error("Invalid price list. Use numbers separated by commas.")
         return
@@ -568,7 +568,7 @@ def add_product_page():
         return
 
     # ---------- CREATE PROJECT ----------
-    project = create_project(product_name, len(prices), prices[0])
+    project = create_project(product_name, len(prices), prices[0])  # temporary: backend still requires price
     if not project or "project_id" not in project:
         st.error("Failed to create project.")
         return
@@ -586,7 +586,6 @@ def add_product_page():
 
     # ---------- SUCCESS UI ----------
     st.success(f"Product '{product_name}' has been successfully created!")
-
 
 
 # ======================================================
@@ -640,11 +639,11 @@ def experiment_page():
     project_data = fetch_project(pid)
 
     st.markdown('<div class="section-title">Product</div>', unsafe_allow_html=True)
-    prod_col1, prod_col2 = st.columns([1.5, 1])
+    prod_col1, prod_col2= st.columns([1.5, 0.3])
 
     if project_data:
         product_name = project_data.get("description", "Unnamed Product")
-        product_image = project_data.get("image_url")
+        product_image = make_public_image_url(project_data.get("image_path"))
 
 
         with prod_col1:
@@ -659,11 +658,23 @@ def experiment_page():
 
         with prod_col2:
             if product_image:
-                st.image(product_image, use_container_width=True)
+                st.markdown(
+                    """
+                    <div style='display:flex; justify-content:flex-end;'>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                st.image(product_image, width=200)  
+
+                st.markdown(
+                    """
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
             else:
                 st.info("No product image available.")
-    else:
-        st.warning("Could not load product details.")
 
     st.markdown("<div class='divider-soft'></div>", unsafe_allow_html=True)
 
