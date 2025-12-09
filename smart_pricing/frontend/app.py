@@ -639,12 +639,11 @@ def experiment_page():
     project_data = fetch_project(pid)
 
     st.markdown('<div class="section-title">Product</div>', unsafe_allow_html=True)
-    prod_col1, prod_col2= st.columns([1.5, 0.3])
+    prod_col1, prod_col2 = st.columns([1.5, 0.3])
 
     if project_data:
         product_name = project_data.get("description", "Unnamed Product")
         product_image = make_public_image_url(project_data.get("image_path"))
-
 
         with prod_col1:
             st.markdown(
@@ -658,21 +657,9 @@ def experiment_page():
 
         with prod_col2:
             if product_image:
-                st.markdown(
-                    """
-                    <div style='display:flex; justify-content:flex-end;'>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-                st.image(product_image, width=200)  
-
-                st.markdown(
-                    """
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                st.markdown("<div style='display:flex; justify-content:flex-end;'>", unsafe_allow_html=True)
+                st.image(product_image, width=200)
+                st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.info("No product image available.")
 
@@ -707,40 +694,61 @@ def experiment_page():
         # -----------------------------------------------------
         total_trials = int(df["trials"].sum())
         total_reward = float(df["reward_sum"].sum())
-        conversion_rate = total_reward / total_trials if total_trials > 0 else 0.0
+
+        # reward ≠ count → conversion computed later
+        conversion_rate = (df["reward_sum"] > 0).sum() / total_trials if total_trials > 0 else 0.0
 
         best_idx = df["mean"].idxmax()
         best_price = df.loc[best_idx, "price"]
         best_mean = df.loc[best_idx, "mean"]
 
         kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
-
         kpi_col1.metric("Total Trials", total_trials)
         kpi_col2.metric("Total Reward", f"{total_reward:.0f}")
         kpi_col3.metric("Conversion Rate", f"{conversion_rate:.2%}")
         kpi_col4.metric("Best Price", f"${best_price:.2f}", f"{best_mean:.3f}")
 
         # -----------------------------------------------------
-        # 5. CHARTS
+        # 5. BANDIT COMPARISON CHART
         # -----------------------------------------------------
         st.subheader("Bandit Performance Comparison")
         comparison_df = df[["price", "mean"]]
         st.bar_chart(comparison_df.set_index("price"), use_container_width=True)
 
+        # -----------------------------------------------------
+        # 6. FIXED ROLLING CONVERSION
+        # -----------------------------------------------------
         st.subheader("Performance Over Time (Rolling Conversion)")
+
         if total_trials > 0:
+            conversions = []
+
+            # Count conversions per bandit properly
+            for _, row in df.iterrows():
+                buys = int(1 if row["reward_sum"] > 0 else 0)
+                no_buys = int(row["trials"] - buys)
+                conversions.extend([1] * buys + [0] * no_buys)
+
+            # enforce equal length
+            conversions = conversions[:total_trials]
+
             timeline_df = pd.DataFrame({
                 "trial": np.arange(1, total_trials + 1),
-                "conversion": [1] * int(total_reward) + [0] * (total_trials - int(total_reward)),
+                "conversion": conversions,
             })
+
             timeline_df["rolling_rate"] = timeline_df["conversion"].rolling(20, min_periods=1).mean()
 
-            st.line_chart(timeline_df.set_index("trial")[["rolling_rate"]], use_container_width=True)
+            st.line_chart(
+                timeline_df.set_index("trial")[["rolling_rate"]],
+                use_container_width=True
+            )
 
         # -----------------------------------------------------
-        # 6. POSTERIOR PLOTS
+        # 7. POSTERIOR PLOTS
         # -----------------------------------------------------
         st.subheader("Posterior Distributions (Thompson Sampling)")
+
         if not df.empty:
             bandit_curves = []
 
@@ -779,7 +787,7 @@ def experiment_page():
         st.info("No bandits found for this project.")
 
     # -----------------------------------------------------
-    # 7. CONTROL SECTION
+    # 8. CONTROL SECTION
     # -----------------------------------------------------
     st.markdown('<div class="section-title">Control</div>', unsafe_allow_html=True)
 
@@ -791,7 +799,7 @@ def experiment_page():
             st.session_state.last_price = float(r["price"])
 
     # -----------------------------------------------------
-    # 8. MANUAL OUTCOMES
+    # 9. MANUAL OUTCOMES
     # -----------------------------------------------------
     st.markdown('<div class="section-title">Manual Outcomes</div>', unsafe_allow_html=True)
     colA, colB = st.columns(2)
