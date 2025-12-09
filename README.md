@@ -232,6 +232,8 @@ The backend is responsible for:
 - recording buy / no-buy outcomes
 - returning analytics data to the frontend
 
+![Swagger UI](docs/swagger.png)
+
 ---
 
 ## Project Endpoints
@@ -449,11 +451,17 @@ It is the primary interface for creating products, managing experiments, and mon
 - Track conversion rate and reward metrics
 - Identify the current best-performing price
 
+![Add Product](docs/add_product.png)
+![Admin Page](docs/admin_page.png)
+![Posterior Plot](docs/plot.png)
+
 ### Customer Page
 - Displays a single special-offer price selected via Thompson Sampling
 - Allows users to submit “Buy” or “Not Interested”
 - Price updates only when the page is refreshed
 - Clean minimal UI optimized for customer interaction
+
+![Customer Page](docs/customer.png)
 
 ### Communication
 All frontend components interact directly with the backend through:
