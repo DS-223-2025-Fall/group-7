@@ -23,7 +23,7 @@
     
     
       
-        <title>ETL - Smart Pricing Playground</title>
+        <title>Core - Smart Pricing Playground</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#etl-pipeline-for-smart-pricing-playground" class="md-skip">
+        <a href="#core-pipeline-for-smart-pricing-playground" class="md-skip">
           Skip to content
         </a>
       
@@ -110,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              ETL
+              Core
             
           </span>
         </div>
@@ -257,7 +257,7 @@
   
     
   
-  ETL
+  Core
 
       </a>
     </li>
@@ -296,25 +296,6 @@
     
   
   APP
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../api_models.md" class="md-tabs__link">
-        
-  
-  
-    
-  
-  API models
 
       </a>
     </li>
@@ -453,7 +434,7 @@
   <span class="md-ellipsis">
     
   
-    ETL
+    Core
   
 
     
@@ -471,7 +452,7 @@
   <span class="md-ellipsis">
     
   
-    ETL
+    Core
   
 
     
@@ -497,10 +478,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-overview-of-the-etl-system" class="md-nav__link">
+  <a href="#1-overview-of-the-core-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Overview of the ETL System
+        1. Overview of the Core Pipeline
       
     </span>
   </a>
@@ -508,22 +489,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-extract-phase" class="md-nav__link">
+  <a href="#2-data-collection-extract-layer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Extract Phase
+        2. Data Collection (Extract Layer)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="2. Extract Phase">
+    <nav class="md-nav" aria-label="2. Data Collection (Extract Layer)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#21-data-sources" class="md-nav__link">
+  <a href="#21-sources-of-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2.1 Data Sources
+        2.1 Sources of Data
       
     </span>
   </a>
@@ -531,10 +512,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#22-event-capture" class="md-nav__link">
+  <a href="#22-event-capture-logic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2.2 Event Capture
+        2.2 Event Capture Logic
       
     </span>
   </a>
@@ -547,22 +528,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-transform-phase" class="md-nav__link">
+  <a href="#3-data-refinement-transform-layer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Transform Phase
+        3. Data Refinement (Transform Layer)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="3. Transform Phase">
+    <nav class="md-nav" aria-label="3. Data Refinement (Transform Layer)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#31-data-cleaning" class="md-nav__link">
+  <a href="#31-cleaning-and-validation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3.1 Data Cleaning
+        3.1 Cleaning and Validation
       
     </span>
   </a>
@@ -570,22 +551,22 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#32-feature-engineering" class="md-nav__link">
+  <a href="#32-feature-construction" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3.2 Feature Engineering
+        3.2 Feature Construction
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="3.2 Feature Engineering">
+    <nav class="md-nav" aria-label="3.2 Feature Construction">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#for-bernoulli-ts-conversion" class="md-nav__link">
+  <a href="#bernoulli-conversion-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        For Bernoulli TS (conversion):
+        Bernoulli conversion model
       
     </span>
   </a>
@@ -593,10 +574,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#for-gaussian-ts-revenue" class="md-nav__link">
+  <a href="#gaussian-revenue-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        For Gaussian TS (revenue):
+        Gaussian revenue model
       
     </span>
   </a>
@@ -609,10 +590,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#33-aggregation-logic" class="md-nav__link">
+  <a href="#33-aggregation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3.3 Aggregation Logic
+        3.3 Aggregation
       
     </span>
   </a>
@@ -620,10 +601,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#34-thompson-sampling-parameter-construction" class="md-nav__link">
+  <a href="#34-thompson-sampling-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3.4 Thompson Sampling Parameter Construction
+        3.4 Thompson Sampling Parameters
       
     </span>
   </a>
@@ -636,22 +617,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-load-phase" class="md-nav__link">
+  <a href="#4-data-storage-and-delivery-load-layer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Load Phase
+        4. Data Storage and Delivery (Load Layer)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="4. Load Phase">
+    <nav class="md-nav" aria-label="4. Data Storage and Delivery (Load Layer)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#41-database-storage" class="md-nav__link">
+  <a href="#41-database-structures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4.1 Database Storage
+        4.1 Database Structures
       
     </span>
   </a>
@@ -659,10 +640,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#42-api-exposure" class="md-nav__link">
+  <a href="#42-api-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4.2 API Exposure
+        4.2 API Integration
       
     </span>
   </a>
@@ -670,10 +651,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#43-analytics-dashboard-integration" class="md-nav__link">
+  <a href="#43-dashboard-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4.3 Analytics Dashboard Integration
+        4.3 Dashboard Integration
       
     </span>
   </a>
@@ -686,10 +667,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-etl-workflow-summary" class="md-nav__link">
+  <a href="#5-core-pipeline-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. ETL Workflow Summary
+        5. Core Pipeline Summary
       
     </span>
   </a>
@@ -697,10 +678,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-why-etl-matters" class="md-nav__link">
+  <a href="#6-importance-of-the-core-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Why ETL Matters
+        6. Importance of the Core Pipeline
       
     </span>
   </a>
@@ -775,33 +756,6 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../api_models.md" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API models
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
     
@@ -816,10 +770,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -837,8 +791,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -900,84 +854,94 @@
 
 
 
-<h1 id="etl-pipeline-for-smart-pricing-playground">ETL Pipeline for Smart Pricing Playground</h1>
-<p>This document describes the end-to-end ETL (Extract–Transform–Load) process used to collect user interaction data, clean and structure it, and prepare it for analysis within the Smart Pricing Playground platform.<br />
-The ETL pipeline ensures that data required for Thompson Sampling and business analytics is accurate, consistent, and always up to date.</p>
+<h1 id="core-pipeline-for-smart-pricing-playground">Core Pipeline for Smart Pricing Playground</h1>
+<p>This document describes the end-to-end <strong>Core Pipeline</strong> used to collect user interaction data, validate and structure it, and prepare it for pricing analytics within the Smart Pricing Playground platform.
+The pipeline ensures that data used for Thompson Sampling and performance analysis is accurate, consistent, and updated continuously.</p>
 <hr />
-<h2 id="1-overview-of-the-etl-system">1. Overview of the ETL System</h2>
-<p>The ETL pipeline supports the adaptive pricing engine by:</p>
+<h2 id="1-overview-of-the-core-pipeline">1. Overview of the Core Pipeline</h2>
+<p>The Core Pipeline supports the adaptive pricing engine by:</p>
 <ul>
-<li>Collecting real-time data from user interactions</li>
+<li>Collecting real-time interaction data</li>
 <li>Validating and cleaning incoming events</li>
-<li>Transforming raw events into structured datasets</li>
-<li>Calculating key metrics needed by Thompson Sampling</li>
-<li>Storing final outputs in a database accessible by the API and dashboard</li>
+<li>Transforming raw events into structured analytical datasets</li>
+<li>Computing metrics required by Thompson Sampling</li>
+<li>Storing final outputs for access by the API and dashboard</li>
 </ul>
-<p>The ETL workflow runs continuously as new impressions and conversions occur.</p>
+<p>This workflow runs continuously as user activity takes place.</p>
 <hr />
-<h2 id="2-extract-phase">2. Extract Phase</h2>
-<h3 id="21-data-sources"><strong>2.1 Data Sources</strong></h3>
-<p>The system extracts data from the following sources:</p>
+<h2 id="2-data-collection-extract-layer">2. Data Collection (Extract Layer)</h2>
+<h3 id="21-sources-of-data">2.1 Sources of Data</h3>
+<p>Data is collected from:</p>
 <ul>
-<li><strong>Frontend Interaction Events</strong></li>
-<li>Impressions (user sees a price)</li>
-<li>Conversions (user purchases or clicks)</li>
+<li>
+<p><strong>Frontend interaction events</strong></p>
+</li>
+<li>
+<p>Impressions</p>
+</li>
+<li>Conversions</li>
 <li>Revenue events</li>
 <li>
-<p>Device/time metadata</p>
+<p>Metadata (device, timestamp, session)</p>
 </li>
 <li>
-<p><strong>Backend API Requests</strong></p>
+<p><strong>Backend API events</strong></p>
 </li>
-<li>Price selection logs</li>
-<li>Experiment triggers</li>
+<li>
+<p>Price selection logs</p>
+</li>
+<li>Experiment lifecycle events</li>
 <li>Bandit updates</li>
 </ul>
-<h3 id="22-event-capture"><strong>2.2 Event Capture</strong></h3>
-<p>Each time a user interacts with the product page, the frontend sends an event to the backend:</p>
+<h3 id="22-event-capture-logic">2.2 Event Capture Logic</h3>
+<p>When a user interacts with a pricing experiment, the frontend sends events such as:</p>
 <ul>
-<li><code>impression_event</code>  </li>
-<li><code>conversion_event</code>  </li>
+<li><code>impression_event</code></li>
+<li><code>conversion_event</code></li>
 <li><code>revenue_event</code></li>
 </ul>
-<p>Each event includes:
-- Experiment ID<br />
-- Bandit/price ID<br />
-- Timestamp<br />
-- User/session identifier<br />
-- Outcome data (click, purchase, amount)  </p>
-<p>Raw events are stored in a staging table or collection.</p>
+<p>Each event includes:</p>
+<ul>
+<li>Experiment ID</li>
+<li>Price/Bandit ID</li>
+<li>Timestamp</li>
+<li>Session or user identifier</li>
+<li>Outcome details (click, purchase, revenue)</li>
+</ul>
+<p>Raw events are stored in a designated staging layer.</p>
 <hr />
-<h2 id="3-transform-phase">3. Transform Phase</h2>
-<p>The Transform phase prepares raw data for learning and analytics.</p>
-<h3 id="31-data-cleaning"><strong>3.1 Data Cleaning</strong></h3>
+<h2 id="3-data-refinement-transform-layer">3. Data Refinement (Transform Layer)</h2>
+<h3 id="31-cleaning-and-validation">3.1 Cleaning and Validation</h3>
+<p>The pipeline performs:</p>
 <ul>
-<li>Remove malformed records  </li>
-<li>Validate experiment ID and price ID  </li>
-<li>Enforce proper types (boolean, numeric, timestamp)  </li>
-<li>Merge duplicate impressions for the same session  </li>
-<li>Normalize revenue values  </li>
+<li>Removal of malformed records</li>
+<li>Validation of experiment and price IDs</li>
+<li>Type enforcement (numeric, boolean, timestamp)</li>
+<li>Deduplication of impressions within a session</li>
+<li>Revenue normalization</li>
 </ul>
-<h3 id="32-feature-engineering"><strong>3.2 Feature Engineering</strong></h3>
-<p>The pipeline generates fields required for Thompson Sampling:</p>
-<h4 id="for-bernoulli-ts-conversion">For Bernoulli TS (conversion):</h4>
+<h3 id="32-feature-construction">3.2 Feature Construction</h3>
+<p>Metrics required for Thompson Sampling are computed:</p>
+<h4 id="bernoulli-conversion-model">Bernoulli conversion model</h4>
 <ul>
-<li><code>trials</code> → number of impressions</li>
-<li><code>successes</code> → number of conversions</li>
-<li><code>failures</code> → trials – successes</li>
+<li><code>trials</code> = impressions</li>
+<li><code>successes</code> = conversions</li>
+<li><code>failures</code> = trials – successes</li>
 </ul>
-<h4 id="for-gaussian-ts-revenue">For Gaussian TS (revenue):</h4>
+<h4 id="gaussian-revenue-model">Gaussian revenue model</h4>
 <ul>
-<li><code>n</code> → number of revenue events</li>
-<li><code>mean</code> → average revenue per user</li>
-<li><code>variance</code> → revenue variability</li>
+<li><code>n</code> = count of revenue observations</li>
+<li><code>mean</code> = average revenue</li>
+<li><code>variance</code> = observed reward variance</li>
 </ul>
-<h3 id="33-aggregation-logic"><strong>3.3 Aggregation Logic</strong></h3>
-<p>Aggregation is done per:
-- Experiment
-- Price arm
-- Time window (optional)</p>
-<p><strong>Example aggregated output:</strong></p>
+<h3 id="33-aggregation">3.3 Aggregation</h3>
+<p>Data is aggregated per:</p>
+<ul>
+<li>Experiment</li>
+<li>Price arm</li>
+<li>Optional time windows</li>
+</ul>
+<p><strong>Example output</strong></p>
 <table>
 <thead>
 <tr>
@@ -1008,72 +972,76 @@ The ETL pipeline ensures that data required for Thompson Sampling and business a
 </tr>
 </tbody>
 </table>
-<h3 id="34-thompson-sampling-parameter-construction"><strong>3.4 Thompson Sampling Parameter Construction</strong></h3>
-<p>For each variant:</p>
-<p><strong>Bernoulli TS:</strong>
-- α = successes + 1<br />
-- β = failures + 1  </p>
-<p><strong>Gaussian TS:</strong>
-- μ = sample mean<br />
-- σ² = sample variance<br />
-- n = count  </p>
-<p>These become the priors/posteriors used for sampling and price selection.</p>
-<hr />
-<h2 id="4-load-phase">4. Load Phase</h2>
-<h3 id="41-database-storage"><strong>4.1 Database Storage</strong></h3>
-<p>Transformed data is loaded into structured tables accessible to:</p>
+<h3 id="34-thompson-sampling-parameters">3.4 Thompson Sampling Parameters</h3>
+<p>For each price arm:</p>
+<p><strong>Bernoulli TS</strong></p>
 <ul>
-<li>The API layer  </li>
-<li>The analytics dashboard  </li>
-<li>The Thompson Sampling engine  </li>
+<li>α = successes + 1</li>
+<li>β = failures + 1</li>
 </ul>
-<p>Common stored datasets include:</p>
-<ol>
-<li><code>experiments</code> (metadata)</li>
-<li><code>bandits</code> (price variants)</li>
-<li><code>impressions</code> (raw events)</li>
-<li><code>conversions</code> (raw events)</li>
-<li><code>aggregates</code> (daily/hourly summaries)</li>
-<li><code>posterior_parameters</code> (α, β, mean, variance)</li>
-</ol>
-<h3 id="42-api-exposure"><strong>4.2 API Exposure</strong></h3>
-<p>Loaded data is used by:
-- <code>/bandits/select</code> → selects next price via Thompson Sampling<br />
-- <code>/bandits/performance</code> → returns analytics tables<br />
-- <code>/bandits/posterior</code> → returns posterior distributions  </p>
-<h3 id="43-analytics-dashboard-integration"><strong>4.3 Analytics Dashboard Integration</strong></h3>
-<p>The final outputs feed into:
-- Price performance tables<br />
-- Conversion charts<br />
-- Revenue graphs<br />
-- Posterior distribution visualizations  </p>
-<p>This allows marketers to monitor experiments in real time.</p>
+<p><strong>Gaussian TS</strong></p>
+<ul>
+<li>μ = sample mean</li>
+<li>σ² = sample variance</li>
+<li>n = observation count</li>
+</ul>
+<p>These parameters form the priors/posteriors used for price selection.</p>
 <hr />
-<h2 id="5-etl-workflow-summary">5. ETL Workflow Summary</h2>
+<h2 id="4-data-storage-and-delivery-load-layer">4. Data Storage and Delivery (Load Layer)</h2>
+<h3 id="41-database-structures">4.1 Database Structures</h3>
+<p>Processed data is stored in:</p>
+<ul>
+<li><code>experiments</code></li>
+<li><code>bandits</code></li>
+<li><code>impressions</code></li>
+<li><code>conversions</code></li>
+<li><code>aggregates</code></li>
+<li><code>posterior_parameters</code></li>
+</ul>
+<p>These tables feed the algorithm, dashboard, and analytics API.</p>
+<h3 id="42-api-integration">4.2 API Integration</h3>
+<p>Stored outputs are used by endpoints such as:</p>
+<ul>
+<li><code>/bandits/select</code> – computes the next price via Thompson Sampling</li>
+<li><code>/bandits/performance</code> – returns experiment metrics</li>
+<li><code>/bandits/posterior</code> – returns posterior distributions</li>
+</ul>
+<h3 id="43-dashboard-integration">4.3 Dashboard Integration</h3>
+<p>The dashboard uses refined data to show:</p>
+<ul>
+<li>Conversion and revenue performance</li>
+<li>Price-arm comparisons</li>
+<li>Posterior distribution graphs</li>
+<li>Experiment progress in real time</li>
+</ul>
+<hr />
+<h2 id="5-core-pipeline-summary">5. Core Pipeline Summary</h2>
 <ol>
 <li>
-<p><strong>Extract</strong><br />
-   Capture real-time interactions, store them as raw events.</p>
+<p><strong>Data Collection</strong>
+   Capture user interactions and store raw records.</p>
 </li>
 <li>
-<p><strong>Transform</strong><br />
-   Clean events, compute metrics, aggregate results, generate TS parameters.</p>
+<p><strong>Data Refinement</strong>
+   Clean, validate, structure, and aggregate data. Compute Thompson Sampling parameters.</p>
 </li>
 <li>
-<p><strong>Load</strong><br />
-   Store final datasets, update dashboards, support the learning algorithm.</p>
+<p><strong>Data Storage &amp; Delivery</strong>
+   Persist processed datasets. Power API endpoints and dashboards.</p>
 </li>
 </ol>
-<p>The ETL pipeline ensures that the adaptive pricing engine has accurate, timely data to make smarter allocation decisions and provide reliable insights.</p>
 <hr />
-<h2 id="6-why-etl-matters">6. Why ETL Matters</h2>
-<p>The performance of Thompson Sampling depends entirely on high-quality structured data.</p>
-<p>A robust ETL pipeline delivers:
-- Accurate conversion and reward metrics<br />
-- Rapid updates to support real-time learning<br />
-- Reliable analytics for business decisions<br />
-- Scalability for large experiments  </p>
-<p>The ETL layer is therefore a critical component of the Smart Pricing Playground architecture.</p>
+<h2 id="6-importance-of-the-core-pipeline">6. Importance of the Core Pipeline</h2>
+<p>Accurate adaptive pricing requires a reliable data pipeline.
+A strong Core Pipeline provides:</p>
+<ul>
+<li>Reliable conversion and revenue metrics</li>
+<li>Fast updates for real-time learning</li>
+<li>High-quality analytics for business insights</li>
+<li>Scalability for larger experiments</li>
+</ul>
+<p>The Core Pipeline is therefore a foundational component of the Smart Pricing Playground system.</p>
+<hr />
 
 
 

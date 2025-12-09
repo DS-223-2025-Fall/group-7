@@ -3,10 +3,9 @@ site_name: Smart Pricing Playground
 nav:
   - Home: index.md
   - Demo: demo.md
-  - ETL: etl.md
+  - Core: etl.md
   - API: api.md
   - APP: app.md
-  - API models: api_models.md
   - API Reference:
       - Backend: reference/backend.md
 

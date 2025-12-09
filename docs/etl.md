@@ -1,177 +1,182 @@
-# ETL Pipeline for Smart Pricing Playground
+# Core Pipeline for Smart Pricing Playground
 
-This document describes the end-to-end ETL (Extract–Transform–Load) process used to collect user interaction data, clean and structure it, and prepare it for analysis within the Smart Pricing Playground platform.  
-The ETL pipeline ensures that data required for Thompson Sampling and business analytics is accurate, consistent, and always up to date.
-
----
-
-## 1. Overview of the ETL System
-
-The ETL pipeline supports the adaptive pricing engine by:
-
-- Collecting real-time data from user interactions
-- Validating and cleaning incoming events
-- Transforming raw events into structured datasets
-- Calculating key metrics needed by Thompson Sampling
-- Storing final outputs in a database accessible by the API and dashboard
-
-The ETL workflow runs continuously as new impressions and conversions occur.
+This document describes the end-to-end **Core Pipeline** used to collect user interaction data, validate and structure it, and prepare it for pricing analytics within the Smart Pricing Playground platform.
+The pipeline ensures that data used for Thompson Sampling and performance analysis is accurate, consistent, and updated continuously.
 
 ---
 
-## 2. Extract Phase
+## 1. Overview of the Core Pipeline
 
-### **2.1 Data Sources**
+The Core Pipeline supports the adaptive pricing engine by:
 
-The system extracts data from the following sources:
+* Collecting real-time interaction data
+* Validating and cleaning incoming events
+* Transforming raw events into structured analytical datasets
+* Computing metrics required by Thompson Sampling
+* Storing final outputs for access by the API and dashboard
 
-- **Frontend Interaction Events**
-  - Impressions (user sees a price)
-  - Conversions (user purchases or clicks)
-  - Revenue events
-  - Device/time metadata
+This workflow runs continuously as user activity takes place.
 
-- **Backend API Requests**
-  - Price selection logs
-  - Experiment triggers
-  - Bandit updates
+---
 
-### **2.2 Event Capture**
+## 2. Data Collection (Extract Layer)
 
-Each time a user interacts with the product page, the frontend sends an event to the backend:
+### 2.1 Sources of Data
 
-- `impression_event`  
-- `conversion_event`  
-- `revenue_event`
+Data is collected from:
+
+* **Frontend interaction events**
+
+  * Impressions
+  * Conversions
+  * Revenue events
+  * Metadata (device, timestamp, session)
+
+* **Backend API events**
+
+  * Price selection logs
+  * Experiment lifecycle events
+  * Bandit updates
+
+### 2.2 Event Capture Logic
+
+When a user interacts with a pricing experiment, the frontend sends events such as:
+
+* `impression_event`
+* `conversion_event`
+* `revenue_event`
 
 Each event includes:
-- Experiment ID  
-- Bandit/price ID  
-- Timestamp  
-- User/session identifier  
-- Outcome data (click, purchase, amount)  
 
-Raw events are stored in a staging table or collection.
+* Experiment ID
+* Price/Bandit ID
+* Timestamp
+* Session or user identifier
+* Outcome details (click, purchase, revenue)
+
+Raw events are stored in a designated staging layer.
 
 ---
 
-## 3. Transform Phase
+## 3. Data Refinement (Transform Layer)
 
-The Transform phase prepares raw data for learning and analytics.
+### 3.1 Cleaning and Validation
 
-### **3.1 Data Cleaning**
-- Remove malformed records  
-- Validate experiment ID and price ID  
-- Enforce proper types (boolean, numeric, timestamp)  
-- Merge duplicate impressions for the same session  
-- Normalize revenue values  
+The pipeline performs:
 
-### **3.2 Feature Engineering**
-The pipeline generates fields required for Thompson Sampling:
+* Removal of malformed records
+* Validation of experiment and price IDs
+* Type enforcement (numeric, boolean, timestamp)
+* Deduplication of impressions within a session
+* Revenue normalization
 
-#### For Bernoulli TS (conversion):
-- `trials` → number of impressions
-- `successes` → number of conversions
-- `failures` → trials – successes
+### 3.2 Feature Construction
 
-#### For Gaussian TS (revenue):
-- `n` → number of revenue events
-- `mean` → average revenue per user
-- `variance` → revenue variability
+Metrics required for Thompson Sampling are computed:
 
-### **3.3 Aggregation Logic**
+#### Bernoulli conversion model
 
-Aggregation is done per:
-- Experiment
-- Price arm
-- Time window (optional)
+* `trials` = impressions
+* `successes` = conversions
+* `failures` = trials – successes
 
-**Example aggregated output:**
+#### Gaussian revenue model
+
+* `n` = count of revenue observations
+* `mean` = average revenue
+* `variance` = observed reward variance
+
+### 3.3 Aggregation
+
+Data is aggregated per:
+
+* Experiment
+* Price arm
+* Optional time windows
+
+**Example output**
 
 | price_id | impressions | conversions | conversion_rate | mean_reward | variance |
-|---------|-------------|-------------|-----------------|-------------|----------|
-| 1       | 120         | 18          | 0.15            | 3.20        | 1.4      |
-| 2       | 115         | 26          | 0.23            | 3.85        | 1.1      |
+| -------- | ----------- | ----------- | --------------- | ----------- | -------- |
+| 1        | 120         | 18          | 0.15            | 3.20        | 1.4      |
+| 2        | 115         | 26          | 0.23            | 3.85        | 1.1      |
 
-### **3.4 Thompson Sampling Parameter Construction**
+### 3.4 Thompson Sampling Parameters
 
-For each variant:
+For each price arm:
 
-**Bernoulli TS:**
-- α = successes + 1  
-- β = failures + 1  
+**Bernoulli TS**
 
-**Gaussian TS:**
-- μ = sample mean  
-- σ² = sample variance  
-- n = count  
+* α = successes + 1
+* β = failures + 1
 
-These become the priors/posteriors used for sampling and price selection.
+**Gaussian TS**
 
----
+* μ = sample mean
+* σ² = sample variance
+* n = observation count
 
-## 4. Load Phase
-
-### **4.1 Database Storage**
-
-Transformed data is loaded into structured tables accessible to:
-
-- The API layer  
-- The analytics dashboard  
-- The Thompson Sampling engine  
-
-Common stored datasets include:
-
-1. `experiments` (metadata)
-2. `bandits` (price variants)
-3. `impressions` (raw events)
-4. `conversions` (raw events)
-5. `aggregates` (daily/hourly summaries)
-6. `posterior_parameters` (α, β, mean, variance)
-
-### **4.2 API Exposure**
-
-Loaded data is used by:
-- `/bandits/select` → selects next price via Thompson Sampling  
-- `/bandits/performance` → returns analytics tables  
-- `/bandits/posterior` → returns posterior distributions  
-
-### **4.3 Analytics Dashboard Integration**
-
-The final outputs feed into:
-- Price performance tables  
-- Conversion charts  
-- Revenue graphs  
-- Posterior distribution visualizations  
-
-This allows marketers to monitor experiments in real time.
+These parameters form the priors/posteriors used for price selection.
 
 ---
 
-## 5. ETL Workflow Summary
+## 4. Data Storage and Delivery (Load Layer)
 
-1. **Extract**  
-   Capture real-time interactions, store them as raw events.
+### 4.1 Database Structures
 
-2. **Transform**  
-   Clean events, compute metrics, aggregate results, generate TS parameters.
+Processed data is stored in:
 
-3. **Load**  
-   Store final datasets, update dashboards, support the learning algorithm.
+* `experiments`
+* `bandits`
+* `impressions`
+* `conversions`
+* `aggregates`
+* `posterior_parameters`
 
-The ETL pipeline ensures that the adaptive pricing engine has accurate, timely data to make smarter allocation decisions and provide reliable insights.
+These tables feed the algorithm, dashboard, and analytics API.
+
+### 4.2 API Integration
+
+Stored outputs are used by endpoints such as:
+
+* `/bandits/select` – computes the next price via Thompson Sampling
+* `/bandits/performance` – returns experiment metrics
+* `/bandits/posterior` – returns posterior distributions
+
+### 4.3 Dashboard Integration
+
+The dashboard uses refined data to show:
+
+* Conversion and revenue performance
+* Price-arm comparisons
+* Posterior distribution graphs
+* Experiment progress in real time
 
 ---
 
-## 6. Why ETL Matters
+## 5. Core Pipeline Summary
 
-The performance of Thompson Sampling depends entirely on high-quality structured data.
+1. **Data Collection**
+   Capture user interactions and store raw records.
 
-A robust ETL pipeline delivers:
-- Accurate conversion and reward metrics  
-- Rapid updates to support real-time learning  
-- Reliable analytics for business decisions  
-- Scalability for large experiments  
+2. **Data Refinement**
+   Clean, validate, structure, and aggregate data. Compute Thompson Sampling parameters.
 
-The ETL layer is therefore a critical component of the Smart Pricing Playground architecture.
+3. **Data Storage & Delivery**
+   Persist processed datasets. Power API endpoints and dashboards.
 
+---
+
+## 6. Importance of the Core Pipeline
+
+Accurate adaptive pricing requires a reliable data pipeline.
+A strong Core Pipeline provides:
+
+* Reliable conversion and revenue metrics
+* Fast updates for real-time learning
+* High-quality analytics for business insights
+* Scalability for larger experiments
+
+The Core Pipeline is therefore a foundational component of the Smart Pricing Playground system.
+
+---
