@@ -7,6 +7,8 @@ nav:
   - API: api.md
   - APP: app.md
   - API models: api_models.md
+  - API Reference:
+      - Backend: reference/backend.md
 
 theme:
   name: material
@@ -35,8 +37,12 @@ theme:
       primary: teal
       accent: lime
 
+
 plugins:
+  - search
   - mkdocstrings:
       handlers:
         python:
-          paths: ["."]
+          options:
+            docstring_style: google
+            show_source: true
