@@ -1,6 +1,15 @@
+# ============================
+#   endpoints.py
+# ============================
+
 from fastapi import (
-    APIRouter, HTTPException, Depends, UploadFile, File,
-    FastAPI, Response,
+    APIRouter,
+    HTTPException,
+    Depends,
+    UploadFile,
+    File,
+    FastAPI,
+    Response,
 )
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -30,20 +39,16 @@ from models.Response.responses import (
     ThompsonSelectResponse,
 )
 
+# ----------------------------------------------------
+#                   ROUTER
+# ----------------------------------------------------
 router = APIRouter()
-
-
 
 # ======================================================
 #  CREATE PROJECT
 # ======================================================
 @router.post("/projects", response_model=CreateProjectResponseModel)
 def create_project(request: CreateProjectRequest, db: Session = Depends(get_db)):
-    """
-    Create a project ONLY.
-    Do NOT auto-create any bandits here.
-    Bandits are created explicitly via /projects/{project_id}/bandits.
-    """
 
     project = Project(
         description=request.description,
@@ -55,21 +60,21 @@ def create_project(request: CreateProjectRequest, db: Session = Depends(get_db))
     db.commit()
     db.refresh(project)
 
-    # ❌ Removed automatic bandit creation here.
-    # Previously we had:
-    # bandit = Bandit(
-    #     project_id=project.project_id,
-    #     price=request.price,
-    #     mean=0.0,
-    #     variance=1.0,
-    #     reward=0.0,
-    #     trial=0,
-    #     number_explored=0,
-    # )
-    # db.add(bandit)
-    # db.commit()
+    # Create first bandit
+    bandit = Bandit(
+        project_id=project.project_id,
+        price=request.price,
+        mean=0.0,
+        variance=1.0,
+        reward=0.0,
+        trial=0,
+        number_explored=0,
+    )
+    db.add(bandit)
+    db.commit()
 
     return project
+
 
 # ======================================================
 #  UPLOAD PROJECT IMAGE
@@ -108,32 +113,13 @@ def upload_project_image(
 # ======================================================
 @router.get("/projects", response_model=list[ProjectItem])
 def list_projects(db: Session = Depends(get_db)):
-    return (
-        db.query(Project)
-        .order_by(Project.created_at.desc())
-        .all()
-    )
-
-# ======================================================
-#  GET SINGLE PROJECT (DETAILS)
-# ======================================================
-@router.get("/projects/{project_id}", response_model=ProjectItem)
-def get_project(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(Project).filter(Project.project_id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return project
-
-
+    return db.query(Project).order_by(Project.created_at.desc()).all()
 
 
 # ======================================================
 #  CREATE BANDIT
 # ======================================================
-@router.post(
-    "/projects/{project_id}/bandits",
-    response_model=CreateBanditResponseModel,
-)
+@router.post("/projects/{project_id}/bandits", response_model=CreateBanditResponseModel)
 def create_bandit(
     project_id: int,
     req: CreateBanditRequestModel,
@@ -163,10 +149,7 @@ def create_bandit(
 # ======================================================
 #  LIST BANDITS
 # ======================================================
-@router.get(
-    "/projects/{project_id}/bandits",
-    response_model=list[BanditReport],
-)
+@router.get("/projects/{project_id}/bandits", response_model=list[BanditReport])
 def get_bandits_for_project(project_id: int, db: Session = Depends(get_db)):
 
     project = db.query(Project).filter_by(project_id=project_id).first()
@@ -179,10 +162,7 @@ def get_bandits_for_project(project_id: int, db: Session = Depends(get_db)):
 # ======================================================
 #  THOMPSON SELECT
 # ======================================================
-@router.post(
-    "/projects/{project_id}/thompson/select",
-    response_model=ThompsonSelectResponse,
-)
+@router.post("/projects/{project_id}/thompson/select", response_model=ThompsonSelectResponse)
 def thompson_select_price(project_id: int, db: Session = Depends(get_db)):
 
     project = db.query(Project).filter_by(project_id=project_id).first()
@@ -197,7 +177,7 @@ def thompson_select_price(project_id: int, db: Session = Depends(get_db)):
     for b in bandits:
         mean = float(b.mean)
         var = max(float(b.variance), 1e-4)
-        std = var ** 0.5
+        std = var**0.5
         sample = np.random.normal(mean, std)
         samples.append((b.bandit_id, sample, float(b.price)))
 
@@ -206,15 +186,51 @@ def thompson_select_price(project_id: int, db: Session = Depends(get_db)):
     project.optimal_price = price
     db.commit()
 
-    return ThompsonSelectResponse(
-        bandit_id=bandit_id,
-        price=price,
-        reason=None,
-    )
+    return ThompsonSelectResponse(bandit_id=bandit_id, price=price)
 
 
 # ======================================================
-#  UPDATE REWARD (NO RESPONSE MODEL IN YOUR CODE)
+#  THOMPSON POSTERIOR PLOT
+# ======================================================
+@router.get("/projects/{project_id}/thompson/plot")
+def thompson_posterior_plot(project_id: int, db: Session = Depends(get_db)):
+
+    project = db.query(Project).filter_by(project_id=project_id).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    bandits = db.query(Bandit).filter_by(project_id=project_id).all()
+    if not bandits:
+        raise HTTPException(404, "No bandits found")
+
+    means = [float(b.mean) for b in bandits]
+    vars_ = [max(float(b.variance), 1e-4) for b in bandits]
+    stds = [v**0.5 for v in vars_]
+
+    xmin = min(means) - 4 * max(stds)
+    xmax = max(means) + 4 * max(stds)
+    x = np.linspace(xmin, xmax, 400)
+
+    plt.figure(figsize=(8, 4))
+    for b in bandits:
+        mean = float(b.mean)
+        var = max(float(b.variance), 1e-4)
+        y = norm.pdf(x, mean, var**0.5)
+        plt.plot(x, y, label=f"Bandit {b.bandit_id} | price={b.price}")
+
+    plt.legend(fontsize=8)
+    plt.grid(True)
+    buf = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+
+    return Response(content=buf.read(), media_type="image/png")
+
+
+# ======================================================
+#  UPDATE REWARD
 # ======================================================
 @router.post("/bandits/{bandit_id}/thompson/reward")
 def submit_reward(
@@ -222,6 +238,7 @@ def submit_reward(
     req: SubmitRewardRequest,
     db: Session = Depends(get_db),
 ):
+
     bandit = db.query(Bandit).filter_by(bandit_id=bandit_id).first()
     if not bandit:
         raise HTTPException(404, "Bandit not found")
@@ -234,14 +251,15 @@ def submit_reward(
     )
     db.add(experiment)
 
-    bandit.reward = float(bandit.reward) + float(req.reward)
+    bandit.reward += req.reward
     bandit.trial += 1
-    bandit.mean = float(bandit.reward) / float(bandit.trial)
-    bandit.variance = max(1.0 / float(bandit.trial), 0.0001)
+    bandit.mean = bandit.reward / bandit.trial
+    bandit.variance = max(1.0 / bandit.trial, 0.0001)
 
     db.commit()
 
     return {
+        "message": "Reward updated",
         "bandit_id": bandit_id,
         "new_mean": bandit.mean,
     }
@@ -251,5 +269,7 @@ def submit_reward(
 #  FASTAPI APP
 # ======================================================
 app = FastAPI()
+
 app.mount("/images", StaticFiles(directory="images"), name="images")
+
 app.include_router(router)
