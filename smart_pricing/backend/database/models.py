@@ -1,4 +1,4 @@
-# backend/database/models.py
+
 from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -34,6 +34,7 @@ class Project(Base):
 
     project_id = Column(Integer, primary_key=True, autoincrement=True)
     description = Column(Text, nullable=False)
+    image_path = Column(String, nullable=True)
     number_bandits = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), default=get_yerevan_time)
     optimal_price = Column(Numeric, nullable=True)
